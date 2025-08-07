@@ -37,13 +37,15 @@ const formatDateForInput = (dateString) => {
 };
 
 // Events Component
-const EventsComponent = ({ onEventCreated }) => {
+const EventsComponent = ({ onEventCreated, showNotification }) => {
   const [events, setEvents] = useState([]);
+  const [publicEvents, setPublicEvents] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showViewForm, setShowViewForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [viewingEvent, setViewingEvent] = useState(null);
+  const [showPublicEvents, setShowPublicEvents] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -51,7 +53,6 @@ const EventsComponent = ({ onEventCreated }) => {
     end_date: new Date().toISOString().split('T')[0],
     start_time: '',
     end_time: '',
-    type: 'daily',
     color: 'blue'
   });
   const [loading, setLoading] = useState(false);
@@ -68,7 +69,7 @@ const EventsComponent = ({ onEventCreated }) => {
   };
 
   useEffect(() => {
-    fetchEvents();
+    fetchPublicEvents();
   }, []);
 
   const fetchEvents = async () => {
@@ -84,6 +85,22 @@ const EventsComponent = ({ onEventCreated }) => {
       }
     } catch (error) {
       console.error('Error fetching events:', error);
+    }
+  };
+
+  const fetchPublicEvents = async () => {
+    try {
+      const response = await fetch('http://localhost:3005/api/events/public/all', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPublicEvents(data);
+      }
+    } catch (error) {
+      console.error('Error fetching public events:', error);
     }
   };
 
@@ -110,10 +127,9 @@ const EventsComponent = ({ onEventCreated }) => {
           end_date: new Date().toISOString().split('T')[0],
           start_time: '',
           end_time: '',
-          type: 'daily',
           color: 'blue'
         });
-        fetchEvents();
+        fetchPublicEvents();
         // Update calendar in real-time
         if (onEventCreated) {
           onEventCreated(newEvent);
@@ -124,11 +140,11 @@ const EventsComponent = ({ onEventCreated }) => {
         }
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi tạo sự kiện');
+        showNotification(error.error || 'Lỗi tạo sự kiện', 'error');
       }
     } catch (error) {
       console.error('Error creating event:', error);
-      alert('Lỗi tạo sự kiện');
+      showNotification('Lỗi tạo sự kiện', 'error');
     } finally {
       setLoading(false);
     }
@@ -149,11 +165,63 @@ const EventsComponent = ({ onEventCreated }) => {
         fetchEvents();
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi xóa sự kiện');
+        showNotification(error.error || 'Lỗi xóa sự kiện', 'error');
       }
     } catch (error) {
       console.error('Error deleting event:', error);
-      alert('Lỗi xóa sự kiện');
+      showNotification('Lỗi xóa sự kiện', 'error');
+    }
+  };
+
+  const handleJoinEvent = async (eventId) => {
+    try {
+      const response = await fetch(`http://localhost:3005/api/events/${eventId}/join`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+      
+      if (response.ok) {
+        showNotification('Đã tham gia sự kiện thành công!', 'success');
+        fetchPublicEvents(); // Refresh danh sách
+        // Tự động cập nhật calendar
+        if (onEventCreated) {
+          onEventCreated();
+        }
+      } else {
+        const error = await response.json();
+        showNotification(error.error || 'Lỗi tham gia sự kiện', 'error');
+      }
+    } catch (error) {
+      console.error('Error joining event:', error);
+      showNotification('Lỗi tham gia sự kiện', 'error');
+    }
+  };
+
+  const handleLeaveEvent = async (eventId) => {
+    try {
+      const response = await fetch(`http://localhost:3005/api/events/${eventId}/leave`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+      
+      if (response.ok) {
+        showNotification('Đã rời khỏi sự kiện thành công!', 'success');
+        fetchPublicEvents(); // Refresh danh sách
+        // Tự động cập nhật calendar
+        if (onEventCreated) {
+          onEventCreated();
+        }
+      } else {
+        const error = await response.json();
+        showNotification(error.error || 'Lỗi rời khỏi sự kiện', 'error');
+      }
+    } catch (error) {
+      console.error('Error leaving event:', error);
+      showNotification('Lỗi rời khỏi sự kiện', 'error');
     }
   };
 
@@ -179,7 +247,6 @@ const EventsComponent = ({ onEventCreated }) => {
       end_date: event.end_date,
       start_time: event.start_time,
       end_time: event.end_time,
-      type: event.type,
       color: event.color
     });
     setShowEditForm(true);
@@ -208,20 +275,19 @@ const EventsComponent = ({ onEventCreated }) => {
           end_date: new Date().toISOString().split('T')[0],
           start_time: '',
           end_time: '',
-          type: 'daily',
           color: 'blue'
         });
-        fetchEvents();
+        fetchPublicEvents();
         if (onEventCreated) {
           onEventCreated();
         }
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi cập nhật sự kiện');
+        showNotification(error.error || 'Lỗi cập nhật sự kiện', 'error');
       }
     } catch (error) {
       console.error('Error updating event:', error);
-      alert('Lỗi cập nhật sự kiện');
+      showNotification('Lỗi cập nhật sự kiện', 'error');
     } finally {
       setLoading(false);
     }
@@ -268,10 +334,14 @@ const EventsComponent = ({ onEventCreated }) => {
               <div className="form-group">
                 <label>Từ ngày:</label>
                 <input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                  min={new Date().toISOString().split('T')[0]}
+                  type="text"
+                  value={formData.start_date ? formatDate(formData.start_date) : ''}
+                  onChange={(e) => {
+                    const dateValue = formatDateForInput(e.target.value);
+                    setFormData({...formData, start_date: dateValue});
+                  }}
+                  placeholder="DD/MM/YYYY"
+                  pattern="\d{2}/\d{2}/\d{4}"
                   required
                 />
               </div>
@@ -279,10 +349,14 @@ const EventsComponent = ({ onEventCreated }) => {
               <div className="form-group">
                 <label>Đến ngày:</label>
                 <input
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                  min={formData.start_date}
+                  type="text"
+                  value={formData.end_date ? formatDate(formData.end_date) : ''}
+                  onChange={(e) => {
+                    const dateValue = formatDateForInput(e.target.value);
+                    setFormData({...formData, end_date: dateValue});
+                  }}
+                  placeholder="DD/MM/YYYY"
+                  pattern="\d{2}/\d{2}/\d{4}"
                   required
                 />
               </div>
@@ -311,19 +385,6 @@ const EventsComponent = ({ onEventCreated }) => {
             </div>
             
             <div className="form-row">
-              <div className="form-group">
-                <label>Loại sự kiện:</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value})}
-                >
-                  <option value="daily">Nhật ký hàng ngày</option>
-                  <option value="meeting">Cuộc họp</option>
-                  <option value="exam">Thi cử</option>
-                  <option value="activity">Hoạt động</option>
-                </select>
-              </div>
-              
               <div className="form-group">
                 <label>Màu sự kiện:</label>
                 <div className="color-picker">
@@ -401,10 +462,14 @@ const EventsComponent = ({ onEventCreated }) => {
               <div className="form-group">
                 <label>Từ ngày:</label>
                 <input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                  min={new Date().toISOString().split('T')[0]}
+                  type="text"
+                  value={formData.start_date ? formatDate(formData.start_date) : ''}
+                  onChange={(e) => {
+                    const dateValue = formatDateForInput(e.target.value);
+                    setFormData({...formData, start_date: dateValue});
+                  }}
+                  placeholder="DD/MM/YYYY"
+                  pattern="\d{2}/\d{2}/\d{4}"
                   required
                 />
               </div>
@@ -412,10 +477,14 @@ const EventsComponent = ({ onEventCreated }) => {
               <div className="form-group">
                 <label>Đến ngày:</label>
                 <input
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                  min={formData.start_date}
+                  type="text"
+                  value={formData.end_date ? formatDate(formData.end_date) : ''}
+                  onChange={(e) => {
+                    const dateValue = formatDateForInput(e.target.value);
+                    setFormData({...formData, end_date: dateValue});
+                  }}
+                  placeholder="DD/MM/YYYY"
+                  pattern="\d{2}/\d{2}/\d{4}"
                   required
                 />
               </div>
@@ -444,19 +513,6 @@ const EventsComponent = ({ onEventCreated }) => {
             </div>
             
             <div className="form-row">
-              <div className="form-group">
-                <label>Loại sự kiện:</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value})}
-                >
-                  <option value="daily">Nhật ký hàng ngày</option>
-                  <option value="meeting">Cuộc họp</option>
-                  <option value="exam">Thi cử</option>
-                  <option value="activity">Hoạt động</option>
-                </select>
-              </div>
-              
               <div className="form-group">
                 <label>Màu sự kiện:</label>
                 <div className="color-picker">
@@ -526,17 +582,12 @@ const EventsComponent = ({ onEventCreated }) => {
             
             <div className="event-view-content">
               <div className="event-view-meta">
-                <p><strong>Loại:</strong> 
-                  {viewingEvent.type === 'daily' ? '📝 Nhật ký hàng ngày' :
-                   viewingEvent.type === 'meeting' ? '🤝 Cuộc họp' :
-                   viewingEvent.type === 'exam' ? '📚 Thi cử' : '🎯 Hoạt động'}
-                </p>
-                <p><strong>Từ:</strong> {new Date(viewingEvent.start_date).toLocaleDateString('vi-VN')}
-                  {viewingEvent.start_time && ` ${viewingEvent.start_time}`}
-                </p>
-                <p><strong>Đến:</strong> {new Date(viewingEvent.end_date).toLocaleDateString('vi-VN')}
-                  {viewingEvent.end_time && ` ${viewingEvent.end_time}`}
-                </p>
+                <p><strong>Từ:</strong> {formatDate(viewingEvent.start_date)}
+                {viewingEvent.start_time && ` ${viewingEvent.start_time}`}
+              </p>
+              <p><strong>Đến:</strong> {formatDate(viewingEvent.end_date)}
+                {viewingEvent.end_time && ` ${viewingEvent.end_time}`}
+              </p>
                 {viewingEvent.description && (
                   <p><strong>Mô tả:</strong> {viewingEvent.description}</p>
                 )}
@@ -570,65 +621,93 @@ const EventsComponent = ({ onEventCreated }) => {
       )}
 
       <div className="events-list">
-        {events.length === 0 ? (
+        {publicEvents.length === 0 ? (
           <div className="empty-state">
             <p>Chưa có sự kiện nào. Hãy tạo sự kiện đầu tiên!</p>
           </div>
         ) : (
-          events.map(event => (
-            <div key={event.id} className="event-card" style={{ borderLeft: `4px solid ${getEventColor(event.color)}` }}>
-              <div className="event-header">
-                <h3>{event.title}</h3>
-                <span className={`event-type ${event.type}`}>
-                  {event.type === 'daily' ? '📝 Nhật ký' :
-                   event.type === 'meeting' ? '🤝 Cuộc họp' :
-                   event.type === 'exam' ? '📚 Thi cử' : '🎯 Hoạt động'}
-                </span>
-              </div>
-              
-              <div className="event-date">
-                <strong>Từ:</strong> {new Date(event.start_date).toLocaleDateString('vi-VN')}
-                {event.start_time && ` ${event.start_time}`}
-                <br />
-                <strong>Đến:</strong> {new Date(event.end_date).toLocaleDateString('vi-VN')}
-                {event.end_time && ` ${event.end_time}`}
-              </div>
-              
-              {event.description && (
-                <div className="event-description">
-                  <strong>Mô tả:</strong> {event.description}
+          publicEvents.map(event => {
+            const isParticipant = event.participants?.some(p => p.user_id === parseInt(localStorage.getItem('userId')));
+            const isOwner = event.user_id === parseInt(localStorage.getItem('userId'));
+            
+            return (
+              <div key={event.id} className="event-card" style={{ borderLeft: `4px solid ${getEventColor(event.color)}` }}>
+                <div className="event-header">
+                  <h3>{event.title}</h3>
+                  {event.creator_name && (
+                    <span className="event-creator">Tạo bởi: {event.creator_name}</span>
+                  )}
                 </div>
-              )}
-              
-              <div className="event-actions">
-                <button 
-                  className="btn-view" 
-                  onClick={() => openViewForm(event)}
-                  title="Xem sự kiện"
-                >
-                  👁️
-                </button>
-                {canEditEvent(event) && (
-                  <>
-                    <button 
-                      className="btn-edit" 
-                      onClick={() => openEditForm(event)}
-                      title="Chỉnh sửa"
-                    >
-                      ✏️
-                    </button>
-                    <button 
-                      className="btn-delete" 
-                      onClick={() => handleDeleteEvent(event.id)}
-                      title="Xóa"
-                    >
-                      🗑️
-                    </button>
-                  </>
+                
+                <div className="event-date">
+                  <strong>Từ:</strong> {formatDate(event.start_date)}
+                  {event.start_time && ` ${event.start_time}`}
+                  <br />
+                  <strong>Đến:</strong> {formatDate(event.end_date)}
+                  {event.end_time && ` ${event.end_time}`}
+                </div>
+                
+                {event.description && (
+                  <div className="event-description">
+                    <strong>Mô tả:</strong> {event.description}
+                  </div>
                 )}
+                
+                {event.participants && event.participants.length > 0 && (
+                  <div className="event-participants">
+                    <strong>Người tham gia:</strong> {event.participants.length} người
+                  </div>
+                )}
+                
+                <div className="event-actions">
+                  <button 
+                    className="btn-view" 
+                    onClick={() => openViewForm(event)}
+                    title="Xem sự kiện"
+                  >
+                    👁️
+                  </button>
+                  {!isOwner && (
+                    isParticipant ? (
+                      <button 
+                        className="btn-leave" 
+                        onClick={() => handleLeaveEvent(event.id)}
+                        title="Rời khỏi sự kiện"
+                      >
+                        🚪
+                      </button>
+                    ) : (
+                      <button 
+                        className="btn-join" 
+                        onClick={() => handleJoinEvent(event.id)}
+                        title="Tham gia sự kiện"
+                      >
+                        ➕
+                      </button>
+                    )
+                  )}
+                  {canEditEvent(event) && (
+                    <>
+                      <button 
+                        className="btn-edit" 
+                        onClick={() => openEditForm(event)}
+                        title="Chỉnh sửa"
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        className="btn-delete" 
+                        onClick={() => handleDeleteEvent(event.id)}
+                        title="Xóa"
+                      >
+                        🗑️
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -636,7 +715,7 @@ const EventsComponent = ({ onEventCreated }) => {
 };
 
 // Diary Component
-const DiaryComponent = ({ onDiaryCreated }) => {
+const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
   const [diaries, setDiaries] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -695,11 +774,11 @@ const DiaryComponent = ({ onDiaryCreated }) => {
         }
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi tạo nhật ký');
+        showNotification(error.error || 'Lỗi tạo nhật ký', 'error');
       }
     } catch (error) {
       console.error('Error creating diary:', error);
-      alert('Lỗi tạo nhật ký');
+      showNotification('Lỗi tạo nhật ký', 'error');
     } finally {
       setLoading(false);
     }
@@ -729,11 +808,11 @@ const DiaryComponent = ({ onDiaryCreated }) => {
         fetchDiaries();
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi cập nhật nhật ký');
+        showNotification(error.error || 'Lỗi cập nhật nhật ký', 'error');
       }
     } catch (error) {
       console.error('Error updating diary:', error);
-      alert('Lỗi cập nhật nhật ký');
+      showNotification('Lỗi cập nhật nhật ký', 'error');
     } finally {
       setLoading(false);
     }
@@ -754,11 +833,11 @@ const DiaryComponent = ({ onDiaryCreated }) => {
         fetchDiaries();
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi xóa nhật ký');
+        showNotification(error.error || 'Lỗi xóa nhật ký', 'error');
       }
     } catch (error) {
       console.error('Error deleting diary:', error);
-      alert('Lỗi xóa nhật ký');
+      showNotification('Lỗi xóa nhật ký', 'error');
     }
   };
 
@@ -1014,7 +1093,8 @@ const CommunityComponent = ({
   selectedPostReactions,
   setSelectedPostReactions,
   reactionStats,
-  setReactionStats
+  setReactionStats,
+  showNotification
 }) => {
   const [posts, setPosts] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -1125,11 +1205,11 @@ const CommunityComponent = ({
         }
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi tạo bài viết');
+        showNotification(error.error || 'Lỗi tạo bài viết', 'error');
       }
     } catch (error) {
       console.error('Error creating post:', error);
-      alert('Lỗi tạo bài viết');
+      showNotification('Lỗi tạo bài viết', 'error');
     } finally {
       setLoading(false);
     }
@@ -1150,11 +1230,11 @@ const CommunityComponent = ({
         fetchPosts();
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi xóa bài viết');
+        showNotification(error.error || 'Lỗi xóa bài viết', 'error');
       }
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert('Lỗi xóa bài viết');
+      showNotification('Lỗi xóa bài viết', 'error');
     }
   };
 
@@ -1232,11 +1312,11 @@ const CommunityComponent = ({
         fetchPosts();
       } else {
         const error = await response.json();
-        alert(error.error || 'Lỗi chỉnh sửa bài viết');
+        showNotification(error.error || 'Lỗi chỉnh sửa bài viết', 'error');
       }
     } catch (error) {
       console.error('Error editing post:', error);
-      alert('Lỗi chỉnh sửa bài viết');
+      showNotification('Lỗi chỉnh sửa bài viết', 'error');
     } finally {
       setLoading(false);
     }
@@ -1527,7 +1607,7 @@ const CommunityComponent = ({
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading image:', error);
-      alert('Lỗi tải ảnh');
+              showNotification('Lỗi tải ảnh', 'error');
     }
   };
 
@@ -2117,7 +2197,7 @@ const CommunityComponent = ({
   );
 };
 
-const ProfileComponent = ({ userId, onClose, setUser, currentUser }) => {
+const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotification }) => {
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -2298,19 +2378,19 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser }) => {
             }));
           }
           
-          alert('Cập nhật profile thành công!');
+          showNotification('Cập nhật profile thành công!', 'success');
         } else {
           const errorText = await response.text();
           console.error('Profile update error:', errorText);
-          alert('Lỗi cập nhật profile: ' + errorText);
+                      showNotification('Lỗi cập nhật profile: ' + errorText, 'error');
         }
       } catch (fetchError) {
         console.error('Fetch error:', fetchError);
-        alert('Lỗi cập nhật profile: ' + fetchError.message);
+                    showNotification('Lỗi cập nhật profile: ' + fetchError.message, 'error');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Lỗi cập nhật profile: ' + error.message);
+              showNotification('Lỗi cập nhật profile: ' + error.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -2626,8 +2706,14 @@ function App() {
   const [showReactionModal, setShowReactionModal] = useState(false);
   const [selectedPostReactions, setSelectedPostReactions] = useState([]);
   const [reactionStats, setReactionStats] = useState({});
+    const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
   
-  // Calendar data
+  const showNotification = (message, type = 'info') => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 3000);
+  };
+    
+    // Calendar data
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [calendarDiaries, setCalendarDiaries] = useState([]);
   
@@ -2723,6 +2809,9 @@ function App() {
           const eventStart = new Date(event.start_date);
           const eventEnd = new Date(event.end_date);
           const todayDate = new Date(today);
+          todayDate.setHours(0, 0, 0, 0);
+          eventStart.setHours(0, 0, 0, 0);
+          eventEnd.setHours(0, 0, 0, 0);
           return todayDate >= eventStart && todayDate <= eventEnd;
         });
         setTodayActivities(todayEvents.length);
@@ -2838,11 +2927,19 @@ function App() {
     today.setHours(0, 0, 0, 0);
     clickedDate.setHours(0, 0, 0, 0);
     
-    // Kiểm tra sự kiện của ngày được chọn
+    // Kiểm tra sự kiện của ngày được chọn (bao gồm sự kiện đa ngày)
     const dayEvents = calendarEvents.filter(event => {
-      const eventDate = new Date(event.start_date);
-      eventDate.setHours(0, 0, 0, 0);
-      return eventDate.getTime() === clickedDate.getTime();
+      const eventStart = new Date(event.start_date);
+      const eventEnd = new Date(event.end_date);
+      eventStart.setHours(0, 0, 0, 0);
+      eventEnd.setHours(0, 0, 0, 0);
+      
+      return clickedDate >= eventStart && clickedDate <= eventEnd;
+    });
+    
+    console.log(`Day ${day} clicked: Found ${dayEvents.length} events`);
+    dayEvents.forEach(event => {
+      console.log(`- Event: ${event.title} (${event.start_date} to ${event.end_date})`);
     });
     
     setSelectedDate(clickedDate);
@@ -2981,7 +3078,7 @@ function App() {
       if (response.ok && data.success) {
         // Hiển thị thông báo thành công
         setError(''); // Xóa lỗi cũ nếu có
-        alert('Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.');
+        showNotification('Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.', 'success');
         
         // Xóa form đăng ký trước
         setAuthData({
@@ -3059,7 +3156,7 @@ function App() {
     setUser(null);
     setIsAuthenticated(false);
     setAuthMode('login');
-    alert('Đã đăng xuất. Vui lòng đăng nhập lại để cập nhật thông tin.');
+            showNotification('Đã đăng xuất. Vui lòng đăng nhập lại để cập nhật thông tin.', 'info');
   };
 
   const renderAuthForm = () => (
@@ -3172,40 +3269,71 @@ function App() {
           const currentDateOnly = new Date(currentDate);
           currentDateOnly.setHours(0, 0, 0, 0);
           
-          return currentDateOnly >= eventStart && currentDateOnly <= eventEnd;
+          // Reset time for event dates to compare only dates
+          const eventStartDate = new Date(eventStart);
+          eventStartDate.setHours(0, 0, 0, 0);
+          const eventEndDate = new Date(eventEnd);
+          eventEndDate.setHours(0, 0, 0, 0);
+          
+          const isInRange = currentDateOnly >= eventStartDate && currentDateOnly <= eventEndDate;
+          
+          // Debug log for day 8-11
+          if (day >= 8 && day <= 11) {
+            console.log(`Day ${day}: Event "${event.title}" (${eventStartDate.toDateString()} - ${eventEndDate.toDateString()}) in range: ${isInRange}`);
+          }
+          
+          return isInRange;
         });
         const dayDiaries = calendarDiaries.filter(diary => 
           new Date(diary.date).toDateString() === currentDate.toDateString()
         );
         
+        // Get primary event color for background
+        const primaryEvent = dayEvents.length > 0 ? dayEvents[0] : null;
+        const backgroundColor = primaryEvent ? getEventColor(primaryEvent.color) : 'transparent';
+        const hasMultipleEvents = dayEvents.length > 1;
+        
         days.push(
           <div 
             key={day} 
-            className={`calendar-day ${isToday ? 'today' : ''}`}
+            className={`calendar-day ${isToday ? 'today' : ''} ${dayEvents.length > 0 ? 'has-events' : ''}`}
             onClick={() => handleDayClick(day)}
+            style={{
+              backgroundColor: backgroundColor,
+              color: backgroundColor !== 'transparent' ? 'white' : 'inherit',
+              position: 'relative'
+            }}
           >
             <span className="day-number">{day}</span>
             {isToday && <div className="today-label">Hôm nay</div>}
+            
+            {/* Event indicators */}
             {dayEvents.length > 0 && (
-              <div className="day-indicators">
-                {dayEvents.map((event, index) => (
+              <div className="day-events">
+                {dayEvents.slice(0, 2).map((event, index) => (
                   <div 
                     key={`event-${event.id}-${index}`}
-                    className="day-indicator event-indicator"
+                    className="event-dot"
                     style={{ 
-                      backgroundColor: getEventColor(event.color),
-                      width: '8px',
-                      height: '8px',
+                      backgroundColor: hasMultipleEvents ? getEventColor(event.color) : 'rgba(255,255,255,0.8)',
+                      width: '6px',
+                      height: '6px',
                       borderRadius: '50%',
-                      margin: '1px'
+                      margin: '1px',
+                      display: 'inline-block'
                     }}
-                    title={`${event.title} (${event.color})`}
+                    title={`${event.title}`}
                   ></div>
                 ))}
+                {hasMultipleEvents && (
+                  <span className="event-count">+{dayEvents.length - 2}</span>
+                )}
               </div>
             )}
+            
+            {/* Diary indicator */}
             {dayDiaries.length > 0 && (
-              <div className="day-indicator diary-indicator" title={`${dayDiaries.length} nhật ký`}>
+              <div className="diary-indicator" title={`${dayDiaries.length} nhật ký`}>
                 📝
               </div>
             )}
@@ -3247,21 +3375,18 @@ function App() {
     return (
       <div className="dashboard">
         <div className="dashboard-content">
-          <div className="welcome-section">
-            <div className="welcome-banner">
-              <h1>Chào mừng, {user?.first_name} {user?.last_name}!</h1>
-              <p>{today.toLocaleDateString('vi-VN', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })} - {today.toLocaleTimeString('vi-VN')}</p>
-              <p style={{ fontSize: '12px', marginTop: '5px', opacity: 0.8 }}>
+          <div className="dashboard-left">
+            <div className="welcome-banner compact">
+              <h2>Chào mừng, {user?.first_name} {user?.last_name}!</h2>
+              <p className="current-time">{today.toLocaleDateString('vi-VN', { 
+                weekday: 'long'
+              })} {today.getDate().toString().padStart(2, '0')}/{(today.getMonth() + 1).toString().padStart(2, '0')}/{today.getFullYear()} - {today.toLocaleTimeString('vi-VN')}</p>
+              <p className="daily-quote">
                 {quoteLoading ? 'Đang tải câu nói động viên...' : dailyQuote}
               </p>
             </div>
 
-            <div className="overview-cards">
+            <div className="overview-cards compact">
               <div className="overview-card clickable" onClick={() => setActiveTab('events')}>
                 <div className="card-header">
                   <div className="card-icon">📅</div>
@@ -3297,30 +3422,32 @@ function App() {
             </div>
           </div>
 
-          <div className="calendar-section">
-            <div className="calendar-header">
-              <button onClick={goToPreviousMonth} className="calendar-nav-btn">‹</button>
-              <h2>Lịch tháng {monthNames[selectedMonth]} năm {selectedYear}</h2>
-              <button onClick={goToNextMonth} className="calendar-nav-btn">›</button>
-            </div>
-            
-            <div className="calendar-container">
-              <div className="calendar-weekdays">
-                <div>CN</div>
-                <div>T2</div>
-                <div>T3</div>
-                <div>T4</div>
-                <div>T5</div>
-                <div>T6</div>
-                <div>T7</div>
+          <div className="dashboard-right">
+            <div className="calendar-section">
+              <div className="calendar-header">
+                <button onClick={goToPreviousMonth} className="calendar-nav-btn">‹</button>
+                <h2>Lịch tháng {monthNames[selectedMonth]} năm {selectedYear}</h2>
+                <button onClick={goToNextMonth} className="calendar-nav-btn">›</button>
               </div>
-              <div className="calendar-grid">
-                {renderCalendar()}
+              
+              <div className="calendar-container">
+                <div className="calendar-weekdays">
+                  <div>CN</div>
+                  <div>T2</div>
+                  <div>T3</div>
+                  <div>T4</div>
+                  <div>T5</div>
+                  <div>T6</div>
+                  <div>T7</div>
+                </div>
+                <div className="calendar-grid">
+                  {renderCalendar()}
+                </div>
               </div>
-            </div>
-            
-            <div className="calendar-actions">
-              <button onClick={goToToday} className="btn-secondary">Hôm nay</button>
+              
+              <div className="calendar-actions">
+                <button onClick={goToToday} className="btn-secondary">Hôm nay</button>
+              </div>
             </div>
           </div>
         </div>
@@ -3391,22 +3518,23 @@ function App() {
 
       <main className="app-main">
         {activeTab === 'dashboard' && renderDashboard()}
-        {activeTab === 'events' && <EventsComponent onEventCreated={calendarUpdateFunctions.addEvent} />}
-                 {activeTab === 'community' && <CommunityComponent 
-          onPostCreated={calendarUpdateFunctions.addPost} 
-          onUserClick={(userId) => {
-            setSelectedUserId(userId);
-            setShowProfileModal(true);
-          }}
-          currentUser={user}
-          showReactionModal={showReactionModal}
-          setShowReactionModal={setShowReactionModal}
-          selectedPostReactions={selectedPostReactions}
-          setSelectedPostReactions={setSelectedPostReactions}
-          reactionStats={reactionStats}
-          setReactionStats={setReactionStats}
-        />}
-        {activeTab === 'diary' && <DiaryComponent onDiaryCreated={calendarUpdateFunctions.addDiary} />}
+        {activeTab === 'events' && <EventsComponent onEventCreated={calendarUpdateFunctions.addEvent} showNotification={showNotification} />}
+                           {activeTab === 'community' && <CommunityComponent 
+            onPostCreated={calendarUpdateFunctions.addPost} 
+            onUserClick={(userId) => {
+              setSelectedUserId(userId);
+              setShowProfileModal(true);
+            }}
+            currentUser={user}
+            showReactionModal={showReactionModal}
+            setShowReactionModal={setShowReactionModal}
+            selectedPostReactions={selectedPostReactions}
+            setSelectedPostReactions={setSelectedPostReactions}
+            reactionStats={reactionStats}
+            setReactionStats={setReactionStats}
+            showNotification={showNotification}
+          />}
+        {activeTab === 'diary' && <DiaryComponent onDiaryCreated={calendarUpdateFunctions.addDiary} showNotification={showNotification} />}
       </main>
 
       {/* Day Click Modal */}
@@ -3414,7 +3542,7 @@ function App() {
         <div className="modal-overlay" onClick={closeDayModal}>
           <div className="day-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Ngày {selectedDate?.toLocaleDateString('vi-VN')}</h3>
+                              <h3>Ngày {selectedDate ? `${selectedDate.getDate().toString().padStart(2, '0')}/${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}/${selectedDate.getFullYear()}` : ''}</h3>
               <button className="modal-close" onClick={closeDayModal}>×</button>
             </div>
             <div className="modal-content">
@@ -3488,7 +3616,23 @@ function App() {
           }}
           setUser={setUser}
           currentUser={user}
+          showNotification={showNotification}
         />
+      )}
+
+      {/* Notification Component */}
+      {notification.show && (
+        <div className={`notification ${notification.type}`}>
+          <div className="notification-content">
+            <span className="notification-message">{notification.message}</span>
+            <button 
+              className="notification-close" 
+              onClick={() => setNotification({ show: false, message: '', type: 'info' })}
+            >
+              ×
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

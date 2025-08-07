@@ -49,6 +49,21 @@ const initDatabase = async () => {
     } catch (error) {
       console.log('Color column already exists or error adding:', error.message);
     }
+
+    // Tạo bảng event_participants
+    const createEventParticipantsTable = `
+      CREATE TABLE IF NOT EXISTS event_participants (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL,
+        user_name VARCHAR(255) NOT NULL,
+        joined_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(event_id, user_id)
+      );
+    `;
+
+    await pool.query(createEventParticipantsTable);
+    console.log('Event participants table initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;

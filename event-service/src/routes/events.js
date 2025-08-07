@@ -181,4 +181,127 @@ router.get('/today/current', authenticateToken, async (req, res) => {
   }
 });
 
+// Lấy tất cả sự kiện công khai (cho các user khác xem)
+router.get('/public/all', authenticateToken, async (req, res) => {
+  try {
+    const query = `
+      SELECT e.*, 
+             u.first_name, u.last_name,
+             ep.user_id as participant_user_id,
+             ep.user_name as participant_name,
+             ep.joined_at
+      FROM events e
+      LEFT JOIN school_auth.users u ON e.user_id = u.id
+      LEFT JOIN event_participants ep ON e.id = ep.event_id
+      ORDER BY e.start_date DESC, e.start_time ASC
+    `;
+    
+    const result = await pool.query(query);
+    
+    // Nhóm sự kiện theo event_id
+    const eventsMap = new Map();
+    result.rows.forEach(row => {
+      if (!eventsMap.has(row.id)) {
+        eventsMap.set(row.id, {
+          ...row,
+          creator_name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+          participants: []
+        });
+      }
+      
+      if (row.participant_user_id) {
+        eventsMap.get(row.id).participants.push({
+          user_id: row.participant_user_id,
+          user_name: row.participant_name,
+          joined_at: row.joined_at
+        });
+      }
+    });
+    
+    res.json(Array.from(eventsMap.values()));
+  } catch (error) {
+    console.error('Error fetching public events:', error);
+    res.status(500).json({ error: 'Lỗi lấy danh sách sự kiện công khai' });
+  }
+});
+
+// Tham gia sự kiện
+router.post('/:id/join', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userName = req.user.name || `${req.user.first_name} ${req.user.last_name}`;
+    
+    // Kiểm tra sự kiện có tồn tại không
+    const eventQuery = 'SELECT * FROM events WHERE id = $1';
+    const eventResult = await pool.query(eventQuery, [id]);
+    
+    if (eventResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy sự kiện' });
+    }
+    
+    // Kiểm tra đã tham gia chưa
+    const participantQuery = 'SELECT * FROM event_participants WHERE event_id = $1 AND user_id = $2';
+    const participantResult = await pool.query(participantQuery, [id, userId]);
+    
+    if (participantResult.rows.length > 0) {
+      return res.status(400).json({ error: 'Bạn đã tham gia sự kiện này rồi' });
+    }
+    
+    // Thêm vào danh sách tham gia
+    const joinQuery = `
+      INSERT INTO event_participants (event_id, user_id, user_name, joined_at)
+      VALUES ($1, $2, $3, NOW())
+      RETURNING *
+    `;
+    
+    await pool.query(joinQuery, [id, userId, userName]);
+    
+    res.json({ message: 'Đã tham gia sự kiện thành công' });
+  } catch (error) {
+    console.error('Error joining event:', error);
+    res.status(500).json({ error: 'Lỗi tham gia sự kiện' });
+  }
+});
+
+// Rời khỏi sự kiện
+router.delete('/:id/leave', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    
+    // Kiểm tra đã tham gia chưa
+    const participantQuery = 'SELECT * FROM event_participants WHERE event_id = $1 AND user_id = $2';
+    const participantResult = await pool.query(participantQuery, [id, userId]);
+    
+    if (participantResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Bạn chưa tham gia sự kiện này' });
+    }
+    
+    // Xóa khỏi danh sách tham gia
+    const leaveQuery = 'DELETE FROM event_participants WHERE event_id = $1 AND user_id = $2';
+    await pool.query(leaveQuery, [id, userId]);
+    
+    res.json({ message: 'Đã rời khỏi sự kiện thành công' });
+  } catch (error) {
+    console.error('Error leaving event:', error);
+    res.status(500).json({ error: 'Lỗi rời khỏi sự kiện' });
+  }
+});
+
+// Lấy danh sách người tham gia sự kiện
+router.get('/:id/participants', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const query = 'SELECT * FROM event_participants WHERE event_id = $1 ORDER BY joined_at ASC';
+    const result = await pool.query(query, [id]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching event participants:', error);
+    res.status(500).json({ error: 'Lỗi lấy danh sách người tham gia' });
+  }
+});
+
 module.exports = router; 
