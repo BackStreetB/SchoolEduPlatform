@@ -1,0 +1,43 @@
+{
+  "name": "tvd-school-platform",
+  "version": "1.0.0",
+  "description": "Nền tảng quản lý trường học thống nhất với kiến trúc microservices",
+  "main": "index.js",
+  "scripts": {
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "restart": "docker-compose restart",
+    "build": "docker-compose build --no-cache",
+    "logs": "docker-compose logs -f",
+    "clean": "docker-compose down -v --remove-orphans",
+    "dev": "docker-compose up",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "school",
+    "education",
+    "platform",
+    "microservices",
+    "react",
+    "nodejs",
+    "postgresql",
+    "docker"
+  ],
+  "author": "TVD Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BackStreetB/SchoolEduPlatform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BackStreetB/SchoolEduPlatform/issues"
+  },
+  "homepage": "https://github.com/BackStreetB/SchoolEduPlatform#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+} 
