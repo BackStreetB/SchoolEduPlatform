@@ -2794,7 +2794,7 @@ function App() {
       if (!token) return;
 
       // Fetch events
-      const eventsResponse = await fetch('http://localhost:3005/api/events', {
+      const eventsResponse = await fetch('http://localhost:3005/api/events/public/all', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -3562,14 +3562,12 @@ function App() {
                             }
                           </span>
                         </div>
+                        {event.creator_name && (
+                          <div className="event-creator">Tạo bởi: {event.creator_name}</div>
+                        )}
                         {event.description && (
                           <div className="event-description">{event.description}</div>
                         )}
-                        <div className="event-type">
-                          <span className="event-type-badge" style={{ backgroundColor: getEventColor(event.color) }}>
-                            {event.type}
-                          </span>
-                        </div>
                       </div>
                     ))}
                   </div>
