@@ -153,6 +153,9 @@ psql -U postgres -f create-reports-db.sql
 - `POST /auth/register` - Đăng ký
 - `POST /auth/login` - Đăng nhập
 - `GET /auth/profile` - Thông tin profile
+- `POST /auth/forgot-password` - Tự động đặt lại mật khẩu (gửi mật khẩu mới qua email)
+- `POST /auth/reset-password` - Đặt lại mật khẩu bằng token
+- `POST /auth/change-password` - Đổi mật khẩu (yêu cầu xác thực)
 
 ### Community Service (Port 3002)
 - `GET /community/posts` - Lấy danh sách bài đăng

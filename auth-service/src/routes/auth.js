@@ -5,6 +5,8 @@ const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth'); // Added import for authenticateToken
 
 const router = express.Router();
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 // Register endpoint
 router.post('/register', async (req, res) => {
@@ -41,6 +43,34 @@ router.post('/register', async (req, res) => {
       'INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, first_name, last_name, role',
       [email, passwordHash, first_name, last_name, 'student']
     );
+
+    // Send welcome/verification email (basic welcome for now)
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      });
+      const fromName = process.env.SMTP_FROM_NAME || 'TVD School Platform';
+      const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      await transporter.sendMail({
+        from: `${fromName} <${fromEmail}>`,
+        to: email,
+        subject: 'Chào mừng đến với TVD School Platform',
+        html: `
+          <div style="font-family:Arial,sans-serif;line-height:1.6">
+            <h2>Xin chào ${first_name} ${last_name}</h2>
+            <p>Bạn đã đăng ký tài khoản thành công.</p>
+            <p>Nhấn vào nút dưới để đăng nhập:</p>
+            <p><a href="${frontendUrl}" style="display:inline-block;background:#16a34a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Đăng nhập</a></p>
+          </div>
+        `,
+      });
+    } catch (mailError) {
+      console.error('Send welcome email error:', mailError.message);
+    }
 
     // Generate tokens
     const accessToken = jwt.sign(
@@ -257,6 +287,157 @@ router.get('/test-token', authenticateToken, (req, res) => {
       last_name: req.user.last_name
     }
   });
+});
+
+// Forgot Password - auto reset password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email là bắt buộc' });
+    }
+
+    // Find user
+    const result = await pool.query('SELECT id, email, first_name, last_name FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) {
+      // Avoid user enumeration
+      return res.json({ success: true, message: 'Nếu email tồn tại, mật khẩu mới đã được gửi' });
+    }
+
+    const user = result.rows[0];
+
+    // Generate new password
+    const newPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4);
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update user password
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [passwordHash, user.id]);
+
+    // Send email with new password
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    const fromName = process.env.SMTP_FROM_NAME || 'TVD School Platform';
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+
+    await transporter.sendMail({
+      from: `${fromName} <${fromEmail}>`,
+      to: user.email,
+      subject: 'Mật khẩu mới của bạn',
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.6">
+          <h2>Xin chào ${user.first_name || ''} ${user.last_name || ''}</h2>
+          <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
+          <p>Mật khẩu mới của bạn là: <strong style="color: #007bff; font-size: 18px;">${newPassword}</strong></p>
+          <p>Vui lòng đăng nhập với mật khẩu mới này và thay đổi mật khẩu trong phần cài đặt tài khoản.</p>
+          <p>Nếu bạn không yêu cầu, hãy liên hệ ngay với quản trị viên.</p>
+        </div>
+      `,
+    });
+
+    res.json({ success: true, message: 'Nếu email tồn tại, mật khẩu mới đã được gửi' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// Reset Password - confirm token and set new password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ success: false, message: 'Thiếu token hoặc mật khẩu mới' });
+    }
+
+    const resetResult = await pool.query(
+      'SELECT * FROM password_resets WHERE token = $1 AND used = false',
+      [token]
+    );
+
+    if (resetResult.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'Token không hợp lệ' });
+    }
+
+    const reset = resetResult.rows[0];
+    if (new Date(reset.expires_at) < new Date()) {
+      return res.status(400).json({ success: false, message: 'Token đã hết hạn' });
+    }
+
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [passwordHash, reset.user_id]);
+    await pool.query('UPDATE password_resets SET used = true WHERE id = $1', [reset.id]);
+
+    res.json({ success: true, message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// Change Password - authenticated user changes their own password
+router.post('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id || req.user.userId;
+    
+    console.log('Change password - User ID from JWT:', userId);
+    console.log('Change password - User object:', req.user);
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu hiện tại và mật khẩu mới là bắt buộc' });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu mới phải có ít nhất 4 ký tự' });
+    }
+
+    // Get current user password - check both users and teacher_profiles tables
+    let userResult = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    
+    if (userResult.rows.length === 0) {
+      // Check if user exists in teacher_profiles
+      const teacherResult = await pool.query('SELECT user_id FROM teacher_profiles WHERE user_id = $1', [userId]);
+      if (teacherResult.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
+      }
+      // If user exists in teacher_profiles but not in users, create a default password
+      const defaultPassword = '123456';
+      const defaultHash = await bcrypt.hash(defaultPassword, 10);
+      await pool.query('INSERT INTO users (id, email, password_hash, first_name, last_name, role, created_at) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)', 
+        [userId, 'user' + userId + '@school.com', defaultHash, 'User', 'Default', 'student']);
+      
+      // Get the newly created user
+      userResult = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    }
+
+    // Verify current password
+    const isValidCurrentPassword = await bcrypt.compare(currentPassword, userResult.rows[0].password_hash);
+    if (!isValidCurrentPassword) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu hiện tại không đúng' });
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newPasswordHash, userId]);
+
+    res.json({ success: true, message: 'Đổi mật khẩu thành công' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
 });
 
 module.exports = router; 

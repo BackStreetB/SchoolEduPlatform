@@ -2215,6 +2215,13 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [avatarFile, setAvatarFile] = useState(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (userId) {
@@ -2288,6 +2295,60 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
     const file = e.target.files[0];
     if (file) {
       setAvatarFile(file);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      showNotification('Mật khẩu nhập lại không khớp', 'error');
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 4) {
+      showNotification('Mật khẩu mới phải có ít nhất 4 ký tự', 'error');
+      return;
+    }
+    
+    setChangingPassword(true);
+    
+    try {
+      console.log('Changing password for user:', currentUser?.id);
+      console.log('Token:', localStorage.getItem('accessToken'));
+      
+      const response = await fetch('/api/auth/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        })
+      });
+      
+      console.log('Change password response status:', response.status);
+      const result = await response.json();
+      console.log('Change password response:', result);
+      
+      if (response.ok && result.success) {
+        showNotification('Đổi mật khẩu thành công!', 'success');
+        setShowChangePassword(false);
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      } else {
+        showNotification(result.message || 'Đổi mật khẩu thất bại', 'error');
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      showNotification('Lỗi đổi mật khẩu', 'error');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -2374,7 +2435,8 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
               ...prevUser,
               first_name: result.data.first_name,
               last_name: result.data.last_name,
-              email: result.data.email
+              email: result.data.email,
+              gender: result.data.gender
             }));
           }
           
@@ -2428,12 +2490,20 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
                       </div>
                     )}
                   </div>
-                  <button 
-                    className="edit-btn"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    ✏️ Chỉnh sửa
-                  </button>
+                  <div className="avatar-actions">
+                    <button 
+                      className="edit-btn"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      ✏️ Chỉnh sửa
+                    </button>
+                    <button 
+                      className="change-password-btn"
+                      onClick={() => setShowChangePassword(true)}
+                    >
+                      🔒 Đổi mật khẩu
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="info-grid">
@@ -2667,6 +2737,84 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
             </div>
           </form>
         )}
+
+        {/* Change Password Modal */}
+        {showChangePassword && (
+          <div className="change-password-modal">
+            <div className="change-password-content">
+              <div className="change-password-header">
+                <h3>Đổi mật khẩu</h3>
+                <button 
+                  className="close-btn" 
+                  onClick={() => {
+                    setShowChangePassword(false);
+                    setPasswordData({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <form onSubmit={handleChangePassword} className="change-password-form">
+                <div className="form-group">
+                  <label>Mật khẩu hiện tại:</label>
+                  <input
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                    placeholder="Nhập mật khẩu hiện tại"
+                    required
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Mật khẩu mới:</label>
+                  <input
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                    placeholder="Nhập mật khẩu mới"
+                    required
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Nhập lại mật khẩu mới:</label>
+                  <input
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                    placeholder="Nhập lại mật khẩu mới"
+                    required
+                  />
+                </div>
+                
+                <div className="form-actions">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setShowChangePassword(false);
+                      setPasswordData({
+                        currentPassword: '',
+                        newPassword: '',
+                        confirmPassword: ''
+                      });
+                    }}
+                  >
+                    Hủy
+                  </button>
+                  <button type="submit" disabled={changingPassword}>
+                    {changingPassword ? 'Đang đổi...' : 'Đổi mật khẩu'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2685,6 +2833,7 @@ function App() {
     password: '',
     name: ''
   });
+  const [forgotEmail, setForgotEmail] = useState('');
 
   // Calendar state - always initialize these
   const today = new Date();
@@ -2786,6 +2935,8 @@ function App() {
       setQuoteLoading(false);
     }
   };
+
+
 
   // Function to fetch calendar data
   const fetchCalendarData = async () => {
@@ -3182,7 +3333,7 @@ function App() {
           </button>
         </div>
         
-        <form onSubmit={authMode === 'login' ? handleLogin : handleRegister} className="auth-form">
+        <form onSubmit={authMode === 'login' ? handleLogin : authMode === 'register' ? handleRegister : (e) => e.preventDefault()} className="auth-form">
           {authMode === 'register' && (
             <div className="form-group">
               <label>Họ tên:</label>
@@ -3195,6 +3346,21 @@ function App() {
               />
             </div>
           )}
+
+          {authMode === 'forgot' && (
+            <div className="form-group">
+              <label>Nhập email để đặt lại mật khẩu:</label>
+              <input
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+              />
+            </div>
+          )}
+
+
           
           <div className="form-group">
             <label>Email:</label>
@@ -3217,24 +3383,72 @@ function App() {
               placeholder="Nhập mật khẩu..."
             />
           </div>
+
+          {authMode === 'login' && (
+            <div style={{ textAlign: 'right', marginTop: '-8px' }}>
+              <button
+                type="button"
+                className="auth-link"
+                onClick={() => {
+                  setForgotEmail(authData.email || '');
+                  setAuthMode('forgot');
+                }}
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
+          )}
           
           {error && <div className="error-message">{error}</div>}
           
-          <button type="submit" className="auth-btn" disabled={loading}>
-            {loading ? 'Đang xử lý...' : (authMode === 'login' ? 'Đăng nhập' : 'Đăng ký')}
-          </button>
+          {authMode === 'login' || authMode === 'register' ? (
+            <button type="submit" className="auth-btn" disabled={loading}>
+              {loading ? 'Đang xử lý...' : (authMode === 'login' ? 'Đăng nhập' : 'Đăng ký')}
+            </button>
+          ) : authMode === 'forgot' && (
+            <button 
+              type="button" 
+              className="auth-btn" 
+              disabled={loading}
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  const res = await fetch('/api/auth/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: forgotEmail })
+                  });
+                  await res.json();
+                  showNotification('Nếu email tồn tại, mật khẩu mới đã được gửi qua email', 'success');
+                  setAuthMode('login');
+                } catch (err) {
+                  showNotification('Không gửi được yêu cầu', 'error');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              Gửi mật khẩu mới
+            </button>
+          )}
         </form>
         
         <div className="auth-footer">
-          <p>
-            {authMode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}
-            <button 
-              className="auth-link"
-              onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-            >
-              {authMode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}
-            </button>
-          </p>
+          {authMode !== 'forgot' && authMode !== 'reset' ? (
+            <p>
+              {authMode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}
+              <button 
+                className="auth-link"
+                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+              >
+                {authMode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}
+              </button>
+            </p>
+          ) : (
+            <p>
+              <button className="auth-link" onClick={() => setAuthMode('login')}>Quay lại đăng nhập</button>
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -3377,7 +3591,7 @@ function App() {
         <div className="dashboard-content">
           <div className="dashboard-left">
             <div className="welcome-banner compact">
-              <h2>Chào mừng, {user?.first_name} {user?.last_name}!</h2>
+              <h2>Chào mừng, {user?.gender === 'Nam' ? 'thầy giáo' : user?.gender === 'Nữ' ? 'cô giáo' : ''} {user?.first_name} {user?.last_name}!</h2>
               <p className="current-time">{today.toLocaleDateString('vi-VN', { 
                 weekday: 'long'
               })} {today.getDate().toString().padStart(2, '0')}/{(today.getMonth() + 1).toString().padStart(2, '0')}/{today.getFullYear()} - {today.toLocaleTimeString('vi-VN')}</p>

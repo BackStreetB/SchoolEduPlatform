@@ -41,6 +41,14 @@ services:
       - GOOGLE_CLIENT_ID=your-google-client-id
       - GOOGLE_CLIENT_SECRET=your-google-client-secret
       - FRONTEND_URL=http://localhost:3000
+      # Dev default: Mailpit container. Override in production with real SMTP
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-TVD School Platform}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-no-reply@tvd.school}
     ports:
       - "3001:3001"
     depends_on:
@@ -50,7 +58,6 @@ services:
       - school_network
     volumes:
       - ./auth-service:/app
-      - /app/node_modules
 
   # Report Service
   report-service:
@@ -212,6 +219,16 @@ services:
     networks:
       - school_network
 
+  # Dev mail catcher (SMTP + Web UI)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - school_network
+
   teacher-service:
     build: ./teacher-service
     container_name: school_teacher_service
@@ -225,6 +242,8 @@ services:
       - DB_PASSWORD=password
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
     volumes:
+      - ./teacher-service:/app
+      - /app/node_modules
       - teacher_uploads:/app/uploads
     depends_on:
       postgres:
