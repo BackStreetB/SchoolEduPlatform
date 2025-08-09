@@ -13,6 +13,15 @@ const authPool = new (require('pg').Pool)({
   password: process.env.DB_PASSWORD || 'password'
 });
 
+// Tạo connection pool cho community database
+const communityPool = new (require('pg').Pool)({
+  host: process.env.DB_HOST || 'postgres',
+  port: process.env.DB_PORT || 5432,
+  database: 'school_community',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'password'
+});
+
 const router = express.Router();
 
 // Function để đồng bộ profile với auth database
@@ -63,6 +72,56 @@ const syncProfileWithAuth = async (userId, profileData) => {
     }
   } catch (error) {
     console.error('❌ Error syncing profile with auth database:', error);
+    // Không throw error để không ảnh hưởng đến việc cập nhật profile chính
+  }
+};
+
+// Function để đồng bộ profile với community database
+const syncProfileWithCommunity = async (userId, profileData) => {
+  try {
+    // Kiểm tra xem user đã tồn tại trong community database chưa
+    const checkQuery = 'SELECT * FROM users WHERE id = $1';
+    const checkResult = await communityPool.query(checkQuery, [userId]);
+    
+    if (checkResult.rows.length > 0) {
+      // Cập nhật thông tin user trong community database
+      const updateQuery = `
+        UPDATE users 
+        SET 
+          first_name = $1, 
+          last_name = $2, 
+          avatar_url = $3,
+          updated_at = NOW()
+        WHERE id = $4
+      `;
+      
+      await communityPool.query(updateQuery, [
+        profileData.first_name, 
+        profileData.last_name, 
+        profileData.avatar_url || null,
+        userId
+      ]);
+      
+      console.log('✅ Profile synced with community database for user:', userId);
+    } else {
+      // Tạo user mới trong community database
+      const insertQuery = `
+        INSERT INTO users (id, first_name, last_name, email, avatar_url)
+        VALUES ($1, $2, $3, $4, $5)
+      `;
+      
+      await communityPool.query(insertQuery, [
+        userId,
+        profileData.first_name, 
+        profileData.last_name, 
+        profileData.email || '',
+        profileData.avatar_url || null
+      ]);
+      
+      console.log('✅ New user created in community database for user:', userId);
+    }
+  } catch (error) {
+    console.error('❌ Error syncing profile with community database:', error);
     // Không throw error để không ảnh hưởng đến việc cập nhật profile chính
   }
 };
@@ -257,6 +316,11 @@ router.post('/', authenticateToken, upload.single('avatar'), async (req, res) =>
         address, subject, education_level, current_class
       });
       
+      // Đồng bộ với community database
+      await syncProfileWithCommunity(userId, {
+        first_name, last_name, email, avatar_url: avatarUrl
+      });
+      
       res.json({
         success: true,
         message: 'Cập nhật profile thành công',
@@ -283,6 +347,11 @@ router.post('/', authenticateToken, upload.single('avatar'), async (req, res) =>
       await syncProfileWithAuth(userId, {
         first_name, last_name, gender, date_of_birth, phone, email,
         address, subject, education_level, current_class
+      });
+      
+      // Đồng bộ với community database
+      await syncProfileWithCommunity(userId, {
+        first_name, last_name, email, avatar_url: avatarUrl
       });
       
       res.status(201).json({

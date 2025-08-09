@@ -28,7 +28,7 @@ class Post {
         FROM posts p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN users u ON p.user_id = u.id
-        WHERE p.id = $1 AND p.is_published = true
+        WHERE p.id = $1
       `;
       const result = await pool.query(query, [id]);
       return result.rows[0];
@@ -73,7 +73,7 @@ class Post {
         FROM posts p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN users u ON p.user_id = u.id
-        WHERE p.is_published = true
+        WHERE 1=1
       `;
       let values = [];
       let paramCount = 0;

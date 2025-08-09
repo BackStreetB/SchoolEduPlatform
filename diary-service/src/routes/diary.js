@@ -10,18 +10,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const today = new Date().toISOString().split('T')[0];
     
-    // Kiểm tra xem đã có nhật ký cho ngày hôm nay chưa
-    const existingDiary = await pool.query(
-      'SELECT * FROM diary_entries WHERE user_id = $1 AND date = $2',
-      [userId, today]
-    );
-    
-    if (existingDiary.rows.length > 0) {
-      return res.status(400).json({ 
-        error: 'Đã có nhật ký cho ngày hôm nay. Mỗi ngày chỉ được viết một nhật ký.' 
-      });
-    }
-    
+    // Cho phép tạo nhiều nhật ký trong ngày
     const query = `
       INSERT INTO diary_entries (user_id, title, content, date, created_at)
       VALUES ($1, $2, $3, $4, NOW())

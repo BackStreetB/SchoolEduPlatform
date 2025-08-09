@@ -68,10 +68,24 @@ const initDatabase = async () => {
       );
     `;
 
+    // Tạo bảng users (cache từ auth database)
+    const createUsersTable = `
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        first_name VARCHAR(100),
+        last_name VARCHAR(100),
+        email VARCHAR(255) UNIQUE,
+        avatar_url VARCHAR(500),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `;
+
     await pool.query(createPostsTable);
     await pool.query(createPostMediaTable);
     await pool.query(createReactionsTable);
     await pool.query(createCommentsTable);
+    await pool.query(createUsersTable);
     
     console.log('Community database tables initialized successfully');
   } catch (error) {

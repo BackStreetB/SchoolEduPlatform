@@ -289,7 +289,7 @@ router.get('/test-token', authenticateToken, (req, res) => {
   });
 });
 
-// Forgot Password - auto reset password
+// Forgot Password - send reset link
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -301,19 +301,22 @@ router.post('/forgot-password', async (req, res) => {
     const result = await pool.query('SELECT id, email, first_name, last_name FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
       // Avoid user enumeration
-      return res.json({ success: true, message: 'Nếu email tồn tại, mật khẩu mới đã được gửi' });
+      return res.json({ success: true, message: 'Nếu email tồn tại, link đặt lại mật khẩu đã được gửi' });
     }
 
     const user = result.rows[0];
 
-    // Generate new password
-    const newPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4);
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    // Generate secure reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
 
-    // Update user password
-    await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [passwordHash, user.id]);
+    // Store reset token in database
+    await pool.query(
+      'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
+      [user.id, resetToken, expiresAt]
+    );
 
-    // Send email with new password
+    // Send email with reset link
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT || 587),
@@ -326,23 +329,52 @@ router.post('/forgot-password', async (req, res) => {
 
     const fromName = process.env.SMTP_FROM_NAME || 'TVD School Platform';
     const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
 
     await transporter.sendMail({
       from: `${fromName} <${fromEmail}>`,
       to: user.email,
-      subject: 'Mật khẩu mới của bạn',
+      subject: 'Đặt lại mật khẩu - TVD School Platform',
       html: `
-        <div style="font-family:Arial,sans-serif;line-height:1.6">
-          <h2>Xin chào ${user.first_name || ''} ${user.last_name || ''}</h2>
+        <div style="font-family:Arial,sans-serif;line-height:1.6;max-width:600px;margin:0 auto">
+          <div style="background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:20px">
+            <h2 style="color:#333;margin:0">TVD School Platform</h2>
+          </div>
+          
+          <h3 style="color:#333">Xin chào ${user.first_name || ''} ${user.last_name || ''}</h3>
+          
           <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
-          <p>Mật khẩu mới của bạn là: <strong style="color: #007bff; font-size: 18px;">${newPassword}</strong></p>
-          <p>Vui lòng đăng nhập với mật khẩu mới này và thay đổi mật khẩu trong phần cài đặt tài khoản.</p>
-          <p>Nếu bạn không yêu cầu, hãy liên hệ ngay với quản trị viên.</p>
+          
+          <p>Nhấn vào nút bên dưới để đặt lại mật khẩu:</p>
+          
+          <div style="text-align:center;margin:30px 0">
+            <a href="${resetLink}" style="display:inline-block;background:#007bff;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+              Đặt lại mật khẩu
+            </a>
+          </div>
+          
+          <p><strong>Lưu ý quan trọng:</strong></p>
+          <ul>
+            <li>Link này chỉ có hiệu lực trong <strong>60 phút</strong></li>
+            <li>Link chỉ có thể sử dụng <strong>1 lần</strong></li>
+            <li>Nếu bạn không yêu cầu, hãy bỏ qua email này</li>
+          </ul>
+          
+          <p>Nếu nút không hoạt động, copy link này vào trình duyệt:</p>
+          <p style="word-break:break-all;background:#f8f9fa;padding:10px;border-radius:4px;font-size:12px">
+            ${resetLink}
+          </p>
+          
+          <hr style="margin:30px 0;border:none;border-top:1px solid #eee">
+          <p style="color:#666;font-size:12px">
+            Email này được gửi tự động. Vui lòng không trả lời email này.
+          </p>
         </div>
       `,
     });
 
-    res.json({ success: true, message: 'Nếu email tồn tại, mật khẩu mới đã được gửi' });
+    res.json({ success: true, message: 'Nếu email tồn tại, link đặt lại mật khẩu đã được gửi' });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ success: false, message: 'Lỗi server' });
@@ -381,6 +413,37 @@ router.post('/reset-password', async (req, res) => {
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// Get current user info
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user.userId;
+    
+    const userResult = await pool.query(
+      'SELECT id, email, first_name, last_name, role, created_at FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Người dùng không tồn tại' 
+      });
+    }
+
+    const user = userResult.rows[0];
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    console.error('Get user info error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Lỗi server' 
+    });
   }
 });
 

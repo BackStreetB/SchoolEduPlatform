@@ -3136,7 +3136,7 @@ function App() {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/auth/profile', {
+      const response = await fetch('/api/auth/auth/me', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
