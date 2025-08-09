@@ -1571,6 +1571,139 @@ const CommunityComponent = ({
     }
   };
 
+  const handleEditComment = async (postId, commentId, newContent) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        console.log('No access token found for editing comment');
+        return;
+      }
+
+      console.log(`Editing comment ${commentId} in post ${postId}: ${newContent}`);
+
+      // Optimistically update the UI first
+      setPosts(prevPosts => 
+        prevPosts.map(p => 
+          p.id === postId 
+            ? { 
+                ...p, 
+                comments: p.comments.map(c => 
+                  c.id === commentId 
+                    ? { ...c, content: newContent, isEditing: false }
+                    : c
+                )
+              }
+            : p
+        )
+      );
+
+      const response = await fetch(`http://localhost:3004/api/community/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: newContent })
+      });
+
+      console.log('Edit comment response status:', response.status);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Comment edited:', result);
+        
+        // Update with the real response from backend
+        setPosts(prevPosts => 
+          prevPosts.map(p => 
+            p.id === postId 
+              ? { 
+                  ...p, 
+                  comments: p.comments.map(c => 
+                    c.id === commentId ? result : c
+                  )
+                }
+              : p
+          )
+        );
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to edit comment:', response.status, errorText);
+        // Revert optimistic update on error
+        fetchPosts();
+      }
+    } catch (error) {
+      console.error('Error editing comment:', error);
+      // Revert optimistic update on error
+      fetchPosts();
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    try {
+      if (!window.confirm('Bạn có chắc muốn xóa bình luận này?')) {
+        return;
+      }
+
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        console.log('No access token found for deleting comment');
+        return;
+      }
+
+      console.log(`Deleting comment ${commentId} from post ${postId}`);
+
+      // Optimistically update the UI first
+      setPosts(prevPosts => 
+        prevPosts.map(p => 
+          p.id === postId 
+            ? { 
+                ...p, 
+                comments: p.comments.filter(c => c.id !== commentId),
+                comment_count: Math.max(0, (p.comment_count || 0) - 1)
+              }
+            : p
+        )
+      );
+
+      const response = await fetch(`http://localhost:3004/api/community/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      console.log('Delete comment response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to delete comment:', response.status, errorText);
+        // Revert optimistic update on error
+        fetchPosts();
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      // Revert optimistic update on error
+      fetchPosts();
+    }
+  };
+
+  const toggleCommentEdit = (postId, commentId) => {
+    setPosts(prevPosts => 
+      prevPosts.map(p => 
+        p.id === postId 
+          ? { 
+              ...p, 
+              comments: p.comments.map(c => 
+                c.id === commentId 
+                  ? { ...c, isEditing: !c.isEditing }
+                  : c
+              )
+            }
+          : p
+      )
+    );
+  };
+
   const formatTimeAgo = (dateString) => {
     const now = new Date();
     const postDate = new Date(dateString);
@@ -2049,9 +2182,74 @@ const CommunityComponent = ({
                     <div className="comments-list">
                       {post.comments && post.comments.map((comment, index) => (
                         <div key={comment.id || index} className="comment-item">
-                          <div className="comment-author">{comment.author_name}</div>
-                          <div className="comment-content">{comment.content}</div>
-                          <div className="comment-time">{formatTimeAgo(comment.created_at)}</div>
+                          <div className="comment-header">
+                            <div className="comment-author">{comment.author_name}</div>
+                            <div className="comment-time">{formatTimeAgo(comment.created_at)}</div>
+                            {comment.user_id === currentUser?.id && (
+                              <div className="comment-actions">
+                                <button 
+                                  className="btn-edit"
+                                  onClick={() => toggleCommentEdit(post.id, comment.id)}
+                                  title="Chỉnh sửa"
+                                >
+                                  ✏️
+                                </button>
+                                <button 
+                                  className="btn-delete"
+                                  onClick={() => handleDeleteComment(post.id, comment.id)}
+                                  title="Xóa"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {comment.isEditing ? (
+                            <div className="comment-edit-form">
+                              <input
+                                type="text"
+                                value={comment.editContent || comment.content}
+                                onChange={(e) => {
+                                  setPosts(prevPosts => 
+                                    prevPosts.map(p => 
+                                      p.id === post.id 
+                                        ? { 
+                                            ...p, 
+                                            comments: p.comments.map(c => 
+                                              c.id === comment.id 
+                                                ? { ...c, editContent: e.target.value }
+                                                : c
+                                            )
+                                          }
+                                        : p
+                                    )
+                                  );
+                                }}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleEditComment(post.id, comment.id, comment.editContent || comment.content);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <div className="edit-actions">
+                                <button 
+                                  className="btn-save"
+                                  onClick={() => handleEditComment(post.id, comment.id, comment.editContent || comment.content)}
+                                >
+                                  💾
+                                </button>
+                                <button 
+                                  className="btn-cancel"
+                                  onClick={() => toggleCommentEdit(post.id, comment.id)}
+                                >
+                                  ❌
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="comment-content">{comment.content}</div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -3683,7 +3881,32 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-left">
-          <div className="logo">🏫</div>
+          <div className="logo" onClick={handleRefreshToken} style={{ cursor: 'pointer' }} title="Cập nhật thông tin">
+            <svg width="40" height="40" viewBox="0 0 100 100">
+              {/* Outer ring */}
+              <circle cx="50" cy="50" r="45" fill="none" stroke="#1e3a8a" strokeWidth="3"/>
+              
+              {/* Top text - TRƯỜNG TIỂU HỌC */}
+              <path d="M 15 50 A 35 35 0 0 1 85 50" fill="none" stroke="none"/>
+              <text x="50" y="25" textAnchor="middle" fontSize="8" fill="#000" fontWeight="bold">TRƯỜNG TIỂU HỌC</text>
+              
+              {/* Graduation cap */}
+              <rect x="35" y="30" width="30" height="8" fill="#1e3a8a" rx="2"/>
+              <rect x="40" y="25" width="20" height="8" fill="#1e3a8a" rx="2"/>
+              <circle cx="65" cy="35" r="2" fill="#fbbf24"/>
+              
+              {/* TVĐ initials */}
+              <text x="50" y="50" textAnchor="middle" fontSize="12" fill="#1e3a8a" fontWeight="bold">TVĐ</text>
+              
+              {/* Horizontal bar with stars */}
+              <rect x="25" y="55" width="50" height="3" fill="#1e3a8a"/>
+              <circle cx="30" cy="56.5" r="1.5" fill="white"/>
+              <circle cx="70" cy="56.5" r="1.5" fill="white"/>
+              
+              {/* Bottom text - TRẦN VĂN ĐANG */}
+              <text x="50" y="75" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold">TRẦN VĂN ĐANG</text>
+            </svg>
+          </div>
           <h1>TVD_School_Platform</h1>
         </div>
         
@@ -3725,7 +3948,6 @@ function App() {
           >
             {user?.first_name} {user?.last_name}
           </span>
-          <button onClick={handleRefreshToken} className="btn-refresh" title="Cập nhật thông tin">🔄</button>
           <button onClick={handleLogout} className="btn-logout">Đăng xuất</button>
         </div>
       </header>

@@ -751,6 +751,80 @@ router.get('/:id/comments', authenticateToken, async (req, res) => {
   }
 });
 
+// Cập nhật comment
+router.put('/comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.id;
+    
+    // Kiểm tra quyền sở hữu
+    const checkQuery = 'SELECT * FROM comments WHERE id = $1 AND user_id = $2';
+    const checkResult = await pool.query(checkQuery, [commentId, userId]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Không có quyền chỉnh sửa comment này' });
+    }
+    
+    // Kiểm duyệt nội dung
+    const moderation = moderateContent(content);
+    if (moderation.isSensitive) {
+      return res.status(400).json({ 
+        error: 'Nội dung chứa từ ngữ không phù hợp',
+        foundWords: moderation.foundWords
+      });
+    }
+    
+    // Cập nhật comment
+    const updateQuery = `
+      UPDATE comments 
+      SET content = $1, updated_at = NOW()
+      WHERE id = $2 AND user_id = $3
+      RETURNING *
+    `;
+    
+    const result = await pool.query(updateQuery, [content, commentId, userId]);
+    
+    // Lấy thông tin user của comment
+    let authorName = `User ${userId}`;
+    
+    try {
+      // Try to get from teacher_profiles first
+      const teacherQuery = 'SELECT first_name, last_name FROM teacher_profiles WHERE user_id = $1';
+      const teacherResult = await pool.query(teacherQuery, [userId]);
+      
+      if (teacherResult.rows.length > 0) {
+        const teacher = teacherResult.rows[0];
+        authorName = `${teacher.first_name} ${teacher.last_name}`.trim();
+      } else {
+        // Fallback to users table
+        const userQuery = 'SELECT first_name, last_name FROM users WHERE id = $1';
+        const userResult = await pool.query(userQuery, [userId]);
+        
+        if (userResult.rows.length > 0) {
+          const user = userResult.rows[0];
+          authorName = user.first_name && user.last_name ? 
+            `${user.first_name} ${user.last_name}`.trim() : 
+            `User ${userId}`;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user info for comment:', error);
+      authorName = req.user.name || `User ${userId}`;
+    }
+    
+    const updatedComment = {
+      ...result.rows[0],
+      author_name: authorName
+    };
+    
+    res.json(updatedComment);
+  } catch (error) {
+    console.error('Error updating comment:', error);
+    res.status(500).json({ error: 'Lỗi cập nhật comment' });
+  }
+});
+
 // Xóa comment
 router.delete('/comments/:commentId', authenticateToken, async (req, res) => {
   try {
