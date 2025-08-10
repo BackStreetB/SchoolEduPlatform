@@ -852,20 +852,8 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
     // Sử dụng local time thay vì UTC
     const today = new Date().toLocaleDateString('en-CA'); // Format: YYYY-MM-DD
     
-    // Xử lý diary.date (có thể là string hoặc Date object)
-    let diaryDate;
-    if (diary.date) {
-      if (typeof diary.date === 'string') {
-        // Nếu là string, chuyển thành local date
-        diaryDate = new Date(diary.date).toLocaleDateString('en-CA');
-      } else {
-        // Nếu là Date object, chuyển thành local date
-        diaryDate = new Date(diary.date).toLocaleDateString('en-CA');
-      }
-    } else {
-      // Fallback to created_at
-      diaryDate = new Date(diary.created_at).toLocaleDateString('en-CA');
-    }
+    // Sử dụng created_at vì database không có trường date riêng
+    const diaryDate = new Date(diary.created_at).toLocaleDateString('en-CA');
     
     const canEdit = diaryDate === today;
     console.log('Diary:', diary.title, 'Date:', diaryDate, 'Today:', today, 'Can edit:', canEdit, 'Diary object:', diary);
@@ -873,7 +861,6 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
     // Debug thêm
     console.log('Today object:', new Date());
     console.log('Today local:', new Date().toLocaleDateString('en-CA'));
-    console.log('Diary date object:', diary.date);
     console.log('Diary created_at:', diary.created_at);
     
     return canEdit;

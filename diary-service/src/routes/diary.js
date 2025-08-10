@@ -8,17 +8,16 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const { title, content } = req.body;
     const userId = req.user.id;
-    const today = new Date().toISOString().split('T')[0];
     
-    // Cho phép tạo nhiều nhật ký trong ngày
+    // Không cần trường date, chỉ sử dụng created_at
     const query = `
-      INSERT INTO diary_entries (user_id, title, content, date, created_at)
-      VALUES ($1, $2, $3, $4, NOW())
+      INSERT INTO diary_entries (user_id, title, content, created_at)
+      VALUES ($1, $2, $3, NOW())
       RETURNING *
     `;
     
     const result = await pool.query(query, [
-      userId, title, content, today
+      userId, title, content
     ]);
     
     res.status(201).json(result.rows[0]);
@@ -35,7 +34,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const query = `
       SELECT * FROM diary_entries 
       WHERE user_id = $1 
-      ORDER BY date DESC
+      ORDER BY created_at DESC
     `;
     
     const result = await pool.query(query, [userId]);
@@ -82,10 +81,21 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
     
     const diary = diaryResult.rows[0];
+    
+    // Sử dụng created_at thay vì date vì database không có trường date riêng
+    const diaryDate = new Date(diary.created_at).toISOString().split('T')[0];
     const today = new Date().toISOString().split('T')[0];
     
+    console.log('Debug diary edit:', {
+      diaryId: id,
+      diaryCreatedAt: diary.created_at,
+      diaryDate: diaryDate,
+      today: today,
+      canEdit: diaryDate === today
+    });
+    
     // Kiểm tra xem nhật ký có phải của hôm nay không
-    if (diary.date !== today) {
+    if (diaryDate !== today) {
       return res.status(403).json({ 
         error: 'Không thể chỉnh sửa nhật ký của ngày khác. Nhật ký chỉ có thể chỉnh sửa trong ngày.' 
       });
@@ -94,7 +104,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const updateQuery = `
       UPDATE diary_entries 
       SET title = $1, content = $2, updated_at = NOW()
-      WHERE id = $5 AND user_id = $6
+      WHERE id = $3 AND user_id = $4
       RETURNING *
     `;
     
@@ -124,10 +134,21 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
     
     const diary = diaryResult.rows[0];
+    
+    // Sử dụng created_at thay vì date vì database không có trường date riêng
+    const diaryDate = new Date(diary.created_at).toISOString().split('T')[0];
     const today = new Date().toISOString().split('T')[0];
     
+    console.log('Debug diary delete:', {
+      diaryId: id,
+      diaryCreatedAt: diary.created_at,
+      diaryDate: diaryDate,
+      today: today,
+      canDelete: diaryDate === today
+    });
+    
     // Kiểm tra xem nhật ký có phải của hôm nay không
-    if (diary.date !== today) {
+    if (diaryDate !== today) {
       return res.status(403).json({ 
         error: 'Không thể xóa nhật ký của ngày khác. Nhật ký chỉ có thể xóa trong ngày.' 
       });
@@ -149,7 +170,8 @@ router.get('/today/current', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const today = new Date().toISOString().split('T')[0];
     
-    const query = 'SELECT * FROM diary_entries WHERE user_id = $1 AND date = $2';
+    // Sử dụng DATE(created_at) thay vì trường date
+    const query = 'SELECT * FROM diary_entries WHERE user_id = $1 AND DATE(created_at) = $2';
     const result = await pool.query(query, [userId, today]);
     
     res.json(result.rows[0] || null);
