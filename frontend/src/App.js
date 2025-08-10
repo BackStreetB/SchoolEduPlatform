@@ -1233,7 +1233,10 @@ const CommunityComponent = ({
         });
         setSelectedFiles([]);
         setPreviewFiles([]);
-        fetchPosts();
+        
+        // Cập nhật state posts trực tiếp thay vì gọi fetchPosts
+        setPosts(prevPosts => [newPost, ...prevPosts]);
+        
         if (onPostCreated) {
           onPostCreated(newPost);
         }
@@ -1261,7 +1264,9 @@ const CommunityComponent = ({
       });
       
       if (response.ok) {
-        fetchPosts();
+        // Cập nhật state posts trực tiếp thay vì gọi fetchPosts
+        setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+        showNotification('Đã xóa bài viết thành công!', 'success');
       } else {
         const error = await response.json();
         showNotification(error.error || 'Lỗi xóa bài viết', 'error');
@@ -1319,7 +1324,19 @@ const CommunityComponent = ({
         .filter(file => file.isExisting)
         .map(file => file.id);
       
-      formDataToSend.append('existing_media', JSON.stringify(existingMediaIds));
+      console.log('🔍 Debug handleEditPost:', {
+        editingPostId: editingPost.id,
+        existingMediaIds: existingMediaIds,
+        previewFiles: previewFiles,
+        selectedFiles: selectedFiles
+      });
+      
+      // Gửi existing_media - nếu rỗng thì gửi string rỗng
+      if (existingMediaIds.length > 0) {
+        formDataToSend.append('existing_media', JSON.stringify(existingMediaIds));
+      } else {
+        formDataToSend.append('existing_media', '');
+      }
       
       // Gửi file mới
       selectedFiles.forEach(file => {
@@ -1335,6 +1352,9 @@ const CommunityComponent = ({
       });
       
       if (response.ok) {
+        const updatedPost = await response.json();
+        console.log('✅ Post updated successfully:', updatedPost);
+        
         setShowEditForm(false);
         setEditingPost(null);
         setFormData({
@@ -1343,13 +1363,31 @@ const CommunityComponent = ({
         });
         setSelectedFiles([]);
         setPreviewFiles([]);
-        fetchPosts();
+        
+        // Cập nhật state posts trực tiếp thay vì gọi fetchPosts
+        setPosts(prevPosts => 
+          prevPosts.map(post => 
+            post.id === editingPost.id 
+              ? {
+                  ...post, // Giữ nguyên tất cả thông tin cũ
+                  content: updatedPost.content,
+                  media: updatedPost.media || [],
+                  updated_at: updatedPost.updated_at,
+                  // Đảm bảo giữ nguyên user_id để canEditPost hoạt động đúng
+                  user_id: post.user_id
+                }
+              : post
+          )
+        );
+        
+        showNotification('Cập nhật bài viết thành công!', 'success');
       } else {
         const error = await response.json();
+        console.error('❌ Error updating post:', error);
         showNotification(error.error || 'Lỗi chỉnh sửa bài viết', 'error');
       }
     } catch (error) {
-      console.error('Error editing post:', error);
+      console.error('❌ Error editing post:', error);
       showNotification('Lỗi chỉnh sửa bài viết', 'error');
     } finally {
       setLoading(false);
@@ -1358,16 +1396,35 @@ const CommunityComponent = ({
 
   const canEditPost = (post) => {
     // Chỉ cho phép chủ sở hữu bài viết chỉnh sửa
-    const canEdit = currentUser && currentUser.id && Number(post.user_id) === Number(currentUser.id);
+    if (!currentUser || !currentUser.id || !post || !post.user_id) {
+      console.log('🔍 Debug canEditPost - Missing data:', {
+        currentUser: currentUser,
+        post: post,
+        hasCurrentUser: !!currentUser,
+        hasCurrentUserId: !!currentUser?.id,
+        hasPost: !!post,
+        hasPostUserId: !!post?.user_id
+      });
+      return false;
+    }
+    
+    // Chuyển đổi cả hai về số để so sánh
+    const currentUserId = parseInt(currentUser.id);
+    const postUserId = parseInt(post.user_id);
+    
+    const canEdit = currentUserId === postUserId;
+    
     console.log('🔍 Debug canEditPost:', {
       currentUser: currentUser,
-      currentUserId: currentUser?.id,
-      currentUserIdType: typeof currentUser?.id,
-      postUserId: post.user_id,
-      postUserIdType: typeof post.user_id,
+      currentUserId: currentUserId,
+      currentUserIdType: typeof currentUserId,
+      postUserId: postUserId,
+      postUserIdType: typeof postUserId,
       postId: post.id,
+      post: post,
       canEdit: canEdit
     });
+    
     return canEdit;
   };
 
@@ -1461,7 +1518,16 @@ const CommunityComponent = ({
           const errorText = await response.text();
           console.error('Failed to add reaction:', response.status, errorText);
           // Revert optimistic update on error
-          fetchPosts();
+          setPosts(prevPosts => 
+            prevPosts.map(post => 
+              post.id === postId 
+                ? { 
+                    ...post, 
+                    userReaction: hadReaction // Revert to previous state
+                  }
+                : post
+            )
+          );
         }
       } else {
         // Remove reaction
@@ -1495,13 +1561,31 @@ const CommunityComponent = ({
           const errorText = await response.text();
           console.error('Failed to remove reaction:', response.status, errorText);
           // Revert optimistic update on error
-          fetchPosts();
+          setPosts(prevPosts => 
+            prevPosts.map(post => 
+              post.id === postId 
+                ? { 
+                    ...post, 
+                    userReaction: hadReaction // Revert to previous state
+                  }
+                : post
+            )
+          );
         }
       }
     } catch (error) {
       console.error('Error handling reaction:', error);
       // Revert optimistic update on error
-      fetchPosts();
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post.id === postId 
+            ? { 
+                ...post, 
+                userReaction: hadReaction // Revert to previous state
+              }
+            : post
+        )
+      );
     }
   };
 
@@ -1782,22 +1866,47 @@ const CommunityComponent = ({
 
   const removeFile = (index) => {
     const fileToRemove = previewFiles[index];
+    console.log('🔍 Debug removeFile:', {
+      index: index,
+      fileToRemove: fileToRemove,
+      isExisting: fileToRemove?.isExisting,
+      previewFilesLength: previewFiles.length,
+      selectedFilesLength: selectedFiles.length
+    });
     
     if (fileToRemove.isExisting) {
       // Nếu là media cũ, chỉ xóa khỏi preview
+      console.log(`🗑️  Xóa media cũ: ${fileToRemove.file_name}`);
       setPreviewFiles(prev => prev.filter((_, i) => i !== index));
     } else {
       // Nếu là file mới, xóa cả preview và selected files
-      setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+      console.log(`🗑️  Xóa file mới: ${fileToRemove.name || fileToRemove.file?.name}`);
+      
+      // Tìm index tương ứng trong selectedFiles
+      const selectedFileIndex = selectedFiles.findIndex(file => 
+        file.name === (fileToRemove.name || fileToRemove.file?.name)
+      );
+      
+      if (selectedFileIndex !== -1) {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== selectedFileIndex));
+        console.log(`✅ Đã xóa file khỏi selectedFiles tại index ${selectedFileIndex}`);
+      }
+      
       setPreviewFiles(prev => {
         const newPreviews = prev.filter((_, i) => i !== index);
         // Revoke object URL to prevent memory leaks
         if (prev[index]?.preview && !prev[index]?.isExisting) {
           URL.revokeObjectURL(prev[index].preview);
+          console.log(`✅ Đã revoke object URL cho file: ${prev[index].name || prev[index].file?.name}`);
         }
         return newPreviews;
       });
     }
+    
+    console.log('🔍 Debug removeFile - After removal:', {
+      newPreviewFilesLength: previewFiles.length - 1,
+      newSelectedFilesLength: selectedFiles.length - (fileToRemove.isExisting ? 0 : 1)
+    });
   };
 
   return (

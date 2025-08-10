@@ -425,13 +425,26 @@ router.put('/:id', authenticateToken, upload.array('media'), async (req, res) =>
     const post = result.rows[0];
     
     // Xử lý media cũ - xóa những media không còn trong danh sách
-    if (existing_media) {
-      const existingMediaIds = JSON.parse(existing_media);
+    if (existing_media !== undefined) {
+      let existingMediaIds = [];
+      
+      // Kiểm tra nếu existing_media không rỗng
+      if (existing_media && existing_media.trim() !== '') {
+        try {
+          existingMediaIds = JSON.parse(existing_media);
+          console.log(`📋 Existing media IDs:`, existingMediaIds);
+        } catch (parseError) {
+          console.error('❌ Error parsing existing_media:', parseError);
+          existingMediaIds = [];
+        }
+      }
       
       // Lấy tất cả media hiện tại của post
       const currentMediaQuery = 'SELECT * FROM post_media WHERE post_id = $1';
       const currentMediaResult = await pool.query(currentMediaQuery, [id]);
       const currentMedia = currentMediaResult.rows;
+      
+      console.log(`📋 Current media in DB:`, currentMedia);
       
       // Tìm media cần xóa (có trong DB nhưng không có trong existing_media)
       const mediaToDelete = currentMedia.filter(media => 
@@ -440,19 +453,30 @@ router.put('/:id', authenticateToken, upload.array('media'), async (req, res) =>
       
       // Xóa files trên disk cho media bị loại bỏ
       console.log(`🗑️  Xóa ${mediaToDelete.length} media files bị loại bỏ`);
-      mediaToDelete.forEach(media => {
-        deleteMediaFile(media.file_name);
-      });
+      for (const media of mediaToDelete) {
+        const deleted = deleteMediaFile(media.file_name);
+        if (deleted) {
+          console.log(`✅ Đã xóa file: ${media.file_name}`);
+        } else {
+          console.log(`⚠️  Không thể xóa file: ${media.file_name}`);
+        }
+      }
       
-      // Thêm lại những media được giữ lại
+      // Lưu thông tin media được giữ lại trước khi xóa
+      let mediaToKeep = [];
       if (existingMediaIds.length > 0) {
         const getMediaQuery = 'SELECT * FROM post_media WHERE id = ANY($1)';
         const mediaResult = await pool.query(getMediaQuery, [existingMediaIds]);
-        
-        // Xóa tất cả media cũ khỏi DB
-        await pool.query('DELETE FROM post_media WHERE post_id = $1', [id]);
-        
-        for (const media of mediaResult.rows) {
+        mediaToKeep = mediaResult.rows;
+        console.log(`📋 Media được giữ lại:`, mediaToKeep);
+      }
+      
+      // Xóa tất cả media cũ khỏi DB
+      await pool.query('DELETE FROM post_media WHERE post_id = $1', [id]);
+      
+      // Thêm lại những media được giữ lại
+      if (mediaToKeep.length > 0) {
+        for (const media of mediaToKeep) {
           const reinsertQuery = `
             INSERT INTO post_media (post_id, file_path, file_type, file_name)
             VALUES ($1, $2, $3, $4)
@@ -461,9 +485,9 @@ router.put('/:id', authenticateToken, upload.array('media'), async (req, res) =>
             id, media.file_path, media.file_type, media.file_name
           ]);
         }
+        console.log(`✅ Đã giữ lại ${mediaToKeep.length} media`);
       } else {
-        // Nếu không có media nào được giữ lại, xóa tất cả
-        await pool.query('DELETE FROM post_media WHERE post_id = $1', [id]);
+        console.log(`🗑️  Đã xóa tất cả media của post ${id}`);
       }
     }
     
@@ -483,24 +507,37 @@ router.put('/:id', authenticateToken, upload.array('media'), async (req, res) =>
           file.filename
         ]);
       }
+      console.log(`✅ Đã thêm ${mediaFiles.length} media mới`);
     }
     
     // Lấy bài viết với media
     const fullPostQuery = `
       SELECT 
-        p.*,
-        json_agg(
-          json_build_object(
-            'id', pm.id,
-            'file_path', pm.file_path,
-            'file_type', pm.file_type,
-            'file_name', pm.file_name
-          )
+        p.id,
+        p.content,
+        p.user_id,
+        p.privacy,
+        p.created_at,
+        p.updated_at,
+        COALESCE(
+          json_agg(
+            CASE 
+              WHEN pm.id IS NOT NULL THEN
+                json_build_object(
+                  'id', pm.id,
+                  'file_path', pm.file_path,
+                  'file_type', pm.file_type,
+                  'file_name', pm.file_name
+                )
+              ELSE NULL
+            END
+          ) FILTER (WHERE pm.id IS NOT NULL),
+          '[]'::json
         ) as media
       FROM posts p
       LEFT JOIN post_media pm ON p.id = pm.post_id
       WHERE p.id = $1
-      GROUP BY p.id
+      GROUP BY p.id, p.content, p.user_id, p.privacy, p.created_at, p.updated_at
     `;
     
     const fullPostResult = await pool.query(fullPostQuery, [post.id]);
