@@ -107,6 +107,17 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
   const handleCreateEvent = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
+    // Validation
+    if (!formData.title || !formData.start_date || !formData.end_date) {
+      showNotification('Vui lòng điền đầy đủ thông tin bắt buộc', 'error');
+      setLoading(false);
+      return;
+    }
+    
+    // Debug: Log form data
+    console.log('Creating event with data:', formData);
+    
     try {
       const response = await fetch('http://localhost:3005/api/events', {
         method: 'POST',
@@ -130,6 +141,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
           color: 'blue'
         });
         fetchPublicEvents();
+        showNotification('Tạo sự kiện thành công!', 'success');
         // Update calendar in real-time
         if (onEventCreated) {
           onEventCreated(newEvent);
@@ -140,6 +152,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
         }
       } else {
         const error = await response.json();
+        console.error('Event creation error:', error);
         showNotification(error.error || 'Lỗi tạo sự kiện', 'error');
       }
     } catch (error) {
@@ -334,14 +347,9 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
               <div className="form-group">
                 <label>Từ ngày:</label>
                 <input
-                  type="text"
-                  value={formData.start_date ? formatDate(formData.start_date) : ''}
-                  onChange={(e) => {
-                    const dateValue = formatDateForInput(e.target.value);
-                    setFormData({...formData, start_date: dateValue});
-                  }}
-                  placeholder="DD/MM/YYYY"
-                  pattern="\d{2}/\d{2}/\d{4}"
+                  type="date"
+                  value={formData.start_date || ''}
+                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
                   required
                 />
               </div>
@@ -349,14 +357,9 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
               <div className="form-group">
                 <label>Đến ngày:</label>
                 <input
-                  type="text"
-                  value={formData.end_date ? formatDate(formData.end_date) : ''}
-                  onChange={(e) => {
-                    const dateValue = formatDateForInput(e.target.value);
-                    setFormData({...formData, end_date: dateValue});
-                  }}
-                  placeholder="DD/MM/YYYY"
-                  pattern="\d{2}/\d{2}/\d{4}"
+                  type="date"
+                  value={formData.end_date || ''}
+                  onChange={(e) => setFormData({...formData, end_date: e.target.value})}
                   required
                 />
               </div>
@@ -367,7 +370,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
                 <label>Giờ bắt đầu:</label>
                 <input
                   type="time"
-                  value={formData.start_time}
+                  value={formData.start_time || ''}
                   onChange={(e) => setFormData({...formData, start_time: e.target.value})}
                   step="60"
                 />
@@ -377,7 +380,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
                 <label>Giờ kết thúc:</label>
                 <input
                   type="time"
-                  value={formData.end_time}
+                  value={formData.end_time || ''}
                   onChange={(e) => setFormData({...formData, end_time: e.target.value})}
                   step="60"
                 />
@@ -462,14 +465,9 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
               <div className="form-group">
                 <label>Từ ngày:</label>
                 <input
-                  type="text"
-                  value={formData.start_date ? formatDate(formData.start_date) : ''}
-                  onChange={(e) => {
-                    const dateValue = formatDateForInput(e.target.value);
-                    setFormData({...formData, start_date: dateValue});
-                  }}
-                  placeholder="DD/MM/YYYY"
-                  pattern="\d{2}/\d{2}/\d{4}"
+                  type="date"
+                  value={formData.start_date || ''}
+                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
                   required
                 />
               </div>
@@ -477,14 +475,9 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
               <div className="form-group">
                 <label>Đến ngày:</label>
                 <input
-                  type="text"
-                  value={formData.end_date ? formatDate(formData.end_date) : ''}
-                  onChange={(e) => {
-                    const dateValue = formatDateForInput(e.target.value);
-                    setFormData({...formData, end_date: dateValue});
-                  }}
-                  placeholder="DD/MM/YYYY"
-                  pattern="\d{2}/\d{2}/\d{4}"
+                  type="date"
+                  value={formData.end_date || ''}
+                  onChange={(e) => setFormData({...formData, end_date: e.target.value})}
                   required
                 />
               </div>
@@ -856,9 +849,33 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
   };
 
   const canEditDiary = (diary) => {
-    const today = new Date().toISOString().split('T')[0];
-    const canEdit = diary.date === today;
-    console.log('Diary:', diary.title, 'Date:', diary.date, 'Today:', today, 'Can edit:', canEdit);
+    // Sử dụng local time thay vì UTC
+    const today = new Date().toLocaleDateString('en-CA'); // Format: YYYY-MM-DD
+    
+    // Xử lý diary.date (có thể là string hoặc Date object)
+    let diaryDate;
+    if (diary.date) {
+      if (typeof diary.date === 'string') {
+        // Nếu là string, chuyển thành local date
+        diaryDate = new Date(diary.date).toLocaleDateString('en-CA');
+      } else {
+        // Nếu là Date object, chuyển thành local date
+        diaryDate = new Date(diary.date).toLocaleDateString('en-CA');
+      }
+    } else {
+      // Fallback to created_at
+      diaryDate = new Date(diary.created_at).toLocaleDateString('en-CA');
+    }
+    
+    const canEdit = diaryDate === today;
+    console.log('Diary:', diary.title, 'Date:', diaryDate, 'Today:', today, 'Can edit:', canEdit, 'Diary object:', diary);
+    
+    // Debug thêm
+    console.log('Today object:', new Date());
+    console.log('Today local:', new Date().toLocaleDateString('en-CA'));
+    console.log('Diary date object:', diary.date);
+    console.log('Diary created_at:', diary.created_at);
+    
     return canEdit;
   };
 
@@ -1037,11 +1054,20 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
                   <h3 className="diary-title">{diary.title}</h3>
                   <div className="diary-meta">
                     <span className="diary-time">
-                      {new Date(diary.created_at).toLocaleTimeString('vi-VN', { 
+                      {new Date(diary.created_at).toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })} - {new Date(diary.created_at).toLocaleTimeString('vi-VN', { 
                         hour: '2-digit', 
                         minute: '2-digit' 
                       })}
                     </span>
+                    {!canEditDiary(diary) && (
+                      <span className="read-only-badge" title="Chỉ có thể xem, không thể chỉnh sửa">
+                        📖 Chỉ đọc
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="diary-actions">
@@ -1052,7 +1078,7 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
                   >
                     👁️
                   </button>
-                  {canEditDiary(diary) && (
+                  {canEditDiary(diary) ? (
                     <>
                       <button 
                         className="btn-edit" 
@@ -1069,6 +1095,14 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
                         🗑️
                       </button>
                     </>
+                  ) : (
+                    <button 
+                      className="btn-edit disabled" 
+                      title="Chỉ có thể chỉnh sửa nhật ký trong ngày"
+                      disabled
+                    >
+                      🔒
+                    </button>
                   )}
                 </div>
               </div>
@@ -2669,10 +2703,10 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
   return (
     <div className="profile-modal">
       <div className="profile-content">
-        <div className="profile-header">
-          <h2>Hồ sơ cá nhân</h2>
-          <button className="close-btn" onClick={onClose}>×</button>
-        </div>
+                      <div className="profile-header">
+                <h2>Hồ sơ cá nhân</h2>
+                <button className="close-btn" onClick={onClose}>×</button>
+              </div>
         
         {!isEditing ? (
           <div className="profile-info">
@@ -3032,6 +3066,8 @@ function App() {
     name: ''
   });
   const [forgotEmail, setForgotEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showPasswordPopup, setShowPasswordPopup] = useState(false);
 
   // Calendar state - always initialize these
   const today = new Date();
@@ -3359,7 +3395,8 @@ function App() {
                 ...userData,
                 first_name: profileData.data.first_name || userData.first_name,
                 last_name: profileData.data.last_name || userData.last_name,
-                email: profileData.data.email || userData.email
+                email: profileData.data.email || userData.email,
+                gender: profileData.data.gender || userData.gender
               };
               
               // Save to localStorage for persistence
@@ -3558,29 +3595,31 @@ function App() {
             </div>
           )}
 
-
-          
-          <div className="form-group">
-            <label>Email:</label>
-            <input
-              type="email"
-              value={authData.email}
-              onChange={(e) => setAuthData({...authData, email: e.target.value})}
-              required
-              placeholder="Nhập email..."
-            />
-          </div>
-          
-          <div className="form-group">
-            <label>Mật khẩu:</label>
-            <input
-              type="password"
-              value={authData.password}
-              onChange={(e) => setAuthData({...authData, password: e.target.value})}
-              required
-              placeholder="Nhập mật khẩu..."
-            />
-          </div>
+          {(authMode === 'login' || authMode === 'register') && (
+            <>
+              <div className="form-group">
+                <label>Email:</label>
+                <input
+                  type="email"
+                  value={authData.email}
+                  onChange={(e) => setAuthData({...authData, email: e.target.value})}
+                  required
+                  placeholder="Nhập email..."
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Mật khẩu:</label>
+                <input
+                  type="password"
+                  value={authData.password}
+                  onChange={(e) => setAuthData({...authData, password: e.target.value})}
+                  required
+                  placeholder="Nhập mật khẩu..."
+                />
+              </div>
+            </>
+          )}
 
           {authMode === 'login' && (
             <div style={{ textAlign: 'right', marginTop: '-8px' }}>
@@ -3593,6 +3632,18 @@ function App() {
                 }}
               >
                 Quên mật khẩu?
+              </button>
+            </div>
+          )}
+          
+          {authMode === 'forgot' && (
+            <div style={{ textAlign: 'right', marginTop: '-8px', marginBottom: '10px' }}>
+              <button
+                type="button"
+                className="auth-link"
+                onClick={() => setAuthMode('login')}
+              >
+                ← Quay lại đăng nhập
               </button>
             </div>
           )}
@@ -3616,9 +3667,20 @@ function App() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: forgotEmail })
                   });
-                  await res.json();
-                  showNotification('Nếu email tồn tại, mật khẩu mới đã được gửi qua email', 'success');
-                  setAuthMode('login');
+                  
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data.newPassword) {
+                      setNewPassword(data.newPassword);
+                      setShowPasswordPopup(true);
+                      showNotification('Mật khẩu mới đã được tạo!', 'success');
+                    } else {
+                      showNotification('Mật khẩu mới đã được gửi qua email', 'success');
+                      setAuthMode('login');
+                    }
+                  } else {
+                    showNotification('Email không tồn tại trong hệ thống', 'error');
+                  }
                 } catch (err) {
                   showNotification('Không gửi được yêu cầu', 'error');
                 } finally {
@@ -3649,6 +3711,57 @@ function App() {
           )}
         </div>
       </div>
+      
+      {/* Popup hiển thị mật khẩu mới */}
+      {showPasswordPopup && (
+        <div className="password-popup-overlay">
+          <div className="password-popup">
+            <h3>Mật khẩu mới của bạn</h3>
+            <div className="password-display">
+              <input
+                type="text"
+                value={newPassword}
+                readOnly
+                className="password-input"
+              />
+              <button
+                type="button"
+                className="copy-btn"
+                onClick={() => {
+                  navigator.clipboard.writeText(newPassword);
+                  showNotification('Đã copy mật khẩu vào clipboard!', 'success');
+                }}
+              >
+                Copy
+              </button>
+            </div>
+            <p className="password-note">
+              Hãy copy mật khẩu này và sử dụng để đăng nhập. 
+              Sau khi đăng nhập thành công, bạn nên đổi mật khẩu mới.
+            </p>
+            <div className="password-popup-buttons">
+              <button
+                type="button"
+                className="auth-btn"
+                onClick={() => {
+                  setShowPasswordPopup(false);
+                  setAuthMode('login');
+                  setAuthData({...authData, email: forgotEmail, password: ''});
+                }}
+              >
+                Đăng nhập ngay
+              </button>
+              <button
+                type="button"
+                className="auth-link"
+                onClick={() => setShowPasswordPopup(false)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -3939,14 +4052,17 @@ function App() {
         
         <div className="nav-user">
           <span 
-            className="user-name" 
+            className="user-icon" 
             style={{ cursor: 'pointer' }}
             onClick={() => {
               setSelectedUserId(user?.id);
               setShowProfileModal(true);
             }}
+            title="Hồ sơ cá nhân"
           >
-            {user?.first_name} {user?.last_name}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="24px" height="24px">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
           </span>
           <button onClick={handleLogout} className="btn-logout">Đăng xuất</button>
         </div>

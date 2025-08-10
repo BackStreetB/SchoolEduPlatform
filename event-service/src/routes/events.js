@@ -181,17 +181,15 @@ router.get('/today/current', authenticateToken, async (req, res) => {
   }
 });
 
-// Lấy tất cả sự kiện công khai (cho các user khác xem)
+// Lấy tất cả sự kiện công khai (đơn giản hóa, không JOIN với users)
 router.get('/public/all', authenticateToken, async (req, res) => {
   try {
     const query = `
       SELECT e.*, 
-             u.first_name, u.last_name,
              ep.user_id as participant_user_id,
              ep.user_name as participant_name,
              ep.joined_at
       FROM events e
-      LEFT JOIN school_auth.users u ON e.user_id = u.id
       LEFT JOIN event_participants ep ON e.id = ep.event_id
       ORDER BY e.start_date DESC, e.start_time ASC
     `;
@@ -204,7 +202,7 @@ router.get('/public/all', authenticateToken, async (req, res) => {
       if (!eventsMap.has(row.id)) {
         eventsMap.set(row.id, {
           ...row,
-          creator_name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+          creator_name: `User ${row.user_id}`, // Đơn giản hóa, không lấy tên từ users table
           participants: []
         });
       }

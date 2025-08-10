@@ -289,7 +289,7 @@ router.get('/test-token', authenticateToken, (req, res) => {
   });
 });
 
-// Forgot Password - send reset link
+// Forgot Password - generate new password and send email
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -300,23 +300,23 @@ router.post('/forgot-password', async (req, res) => {
     // Find user
     const result = await pool.query('SELECT id, email, first_name, last_name FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
-      // Avoid user enumeration
-      return res.json({ success: true, message: 'Nếu email tồn tại, link đặt lại mật khẩu đã được gửi' });
+      return res.json({ success: false, message: 'Email không tồn tại trong hệ thống' });
     }
 
     const user = result.rows[0];
 
-    // Generate secure reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+    // Generate new random password
+    const newPassword = crypto.randomBytes(8).toString('hex');
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
 
-    // Store reset token in database
+    // Update user's password
     await pool.query(
-      'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)',
-      [user.id, resetToken, expiresAt]
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [newPasswordHash, user.id]
     );
 
-    // Send email with reset link
+    // Send email with new password
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT || 587),
@@ -329,13 +329,11 @@ router.post('/forgot-password', async (req, res) => {
 
     const fromName = process.env.SMTP_FROM_NAME || 'TVD School Platform';
     const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
 
     await transporter.sendMail({
       from: `${fromName} <${fromEmail}>`,
       to: user.email,
-      subject: 'Đặt lại mật khẩu - TVD School Platform',
+      subject: 'Mật khẩu mới - TVD School Platform',
       html: `
         <div style="font-family:Arial,sans-serif;line-height:1.6;max-width:600px;margin:0 auto">
           <div style="background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:20px">
@@ -344,27 +342,14 @@ router.post('/forgot-password', async (req, res) => {
           
           <h3 style="color:#333">Xin chào ${user.first_name || ''} ${user.last_name || ''}</h3>
           
-          <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
-          
-          <p>Nhấn vào nút bên dưới để đặt lại mật khẩu:</p>
-          
-          <div style="text-align:center;margin:30px 0">
-            <a href="${resetLink}" style="display:inline-block;background:#007bff;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
-              Đặt lại mật khẩu
-            </a>
-          </div>
+          <p>Mật khẩu mới của bạn là: <strong>${newPassword}</strong></p>
           
           <p><strong>Lưu ý quan trọng:</strong></p>
           <ul>
-            <li>Link này chỉ có hiệu lực trong <strong>60 phút</strong></li>
-            <li>Link chỉ có thể sử dụng <strong>1 lần</strong></li>
-            <li>Nếu bạn không yêu cầu, hãy bỏ qua email này</li>
+            <li>Hãy sử dụng mật khẩu này để đăng nhập</li>
+            <li>Sau khi đăng nhập thành công, bạn nên đổi mật khẩu mới</li>
+            <li>Không chia sẻ mật khẩu này với ai</li>
           </ul>
-          
-          <p>Nếu nút không hoạt động, copy link này vào trình duyệt:</p>
-          <p style="word-break:break-all;background:#f8f9fa;padding:10px;border-radius:4px;font-size:12px">
-            ${resetLink}
-          </p>
           
           <hr style="margin:30px 0;border:none;border-top:1px solid #eee">
           <p style="color:#666;font-size:12px">
@@ -374,7 +359,12 @@ router.post('/forgot-password', async (req, res) => {
       `,
     });
 
-    res.json({ success: true, message: 'Nếu email tồn tại, link đặt lại mật khẩu đã được gửi' });
+    // Return new password to frontend
+    res.json({ 
+      success: true, 
+      message: 'Mật khẩu mới đã được gửi qua email',
+      newPassword: newPassword 
+    });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ success: false, message: 'Lỗi server' });
