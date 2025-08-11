@@ -443,6 +443,13 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
+.multi-day-indicator {
+  font-size: 9px;
+  font-weight: normal;
+  opacity: 0.9;
+  font-style: italic;
+}
+
 /* Current Time Indicator */
 .current-time-indicator {
   position: absolute;

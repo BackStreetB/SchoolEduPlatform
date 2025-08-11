@@ -96,19 +96,66 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
     return currentDate.toLocaleDateString('vi-VN', options);
   };
 
-  // Get events for specific date
+  // Get events for specific date (including multi-day events)
   const getEventsForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    const viewDate = new Date(date);
+    viewDate.setHours(0, 0, 0, 0);
+    
     return events.filter(event => {
-      const eventDate = new Date(event.start_date).toISOString().split('T')[0];
-      return eventDate === dateStr;
+      const eventStartDate = new Date(event.start_date);
+      const eventEndDate = new Date(event.end_date);
+      eventStartDate.setHours(0, 0, 0, 0);
+      eventEndDate.setHours(0, 0, 0, 0);
+      
+      // Check if the view date falls within the event's date range
+      return viewDate >= eventStartDate && viewDate <= eventEndDate;
     });
   };
 
-  // Calculate event position in timeline
-  const getEventPosition = (event) => {
-    const startTime = event.start_time || '00:00:00';
-    const endTime = event.end_time || '23:59:00';
+  // Calculate event position in timeline for a specific day
+  const getEventPosition = (event, currentViewDate, overlappingEvents = [], eventIndex = 0) => {
+    const eventStartDate = new Date(event.start_date);
+    const eventEndDate = new Date(event.end_date);
+    const viewDate = new Date(currentViewDate);
+    
+    // Reset time to compare dates only
+    eventStartDate.setHours(0, 0, 0, 0);
+    eventEndDate.setHours(0, 0, 0, 0);
+    viewDate.setHours(0, 0, 0, 0);
+    
+    let startTime, endTime;
+    
+    // Determine start and end time for the current viewing date
+    if (viewDate.getTime() === eventStartDate.getTime() && viewDate.getTime() === eventEndDate.getTime()) {
+      // Single day event
+      startTime = event.start_time || '00:00:00';
+      endTime = event.end_time || '23:59:00';
+    } else if (viewDate.getTime() === eventStartDate.getTime()) {
+      // First day of multi-day event
+      startTime = event.start_time || '00:00:00';
+      endTime = '23:59:00';
+    } else if (viewDate.getTime() === eventEndDate.getTime()) {
+      // Last day of multi-day event
+      startTime = '00:00:00';
+      endTime = event.end_time || '23:59:00';
+    } else if (viewDate > eventStartDate && viewDate < eventEndDate) {
+      // Middle day of multi-day event
+      startTime = '00:00:00';
+      endTime = '23:59:00';
+    } else {
+      // Event doesn't occur on this date
+      return null;
+    }
+    
+    // Fix same start/end time issue
+    if (startTime === endTime) {
+      const [hour, minute] = startTime.split(':').map(Number);
+      if (hour < 23) {
+        endTime = `${(hour + 1).toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
+      } else {
+        endTime = '23:59:00';
+      }
+    }
     
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const [endHour, endMinute] = endTime.split(':').map(Number);
@@ -116,9 +163,19 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
     const startPosition = (startHour * 60 + startMinute) * (60 / 60); // 60px per hour
     const duration = ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) * (60 / 60);
     
+    // Calculate width and left position for overlapping events
+    const totalOverlapping = overlappingEvents.length;
+    const width = totalOverlapping > 1 ? 90 / totalOverlapping : 100; // Share width
+    const leftOffset = totalOverlapping > 1 ? (eventIndex * width) : 0;
+    
     return {
       top: startPosition,
-      height: Math.max(duration, 30) // Minimum 30px height
+      height: Math.max(duration, 30), // Minimum 30px height
+      width: `${width}%`,
+      left: `${leftOffset}%`,
+      isMultiDay: eventStartDate.getTime() !== eventEndDate.getTime(),
+      isFirstDay: viewDate.getTime() === eventStartDate.getTime(),
+      isLastDay: viewDate.getTime() === eventEndDate.getTime()
     };
   };
 
@@ -342,24 +399,63 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
 
             {/* Events */}
             {dayEvents.map((event, idx) => {
-              const position = getEventPosition(event);
+              // Find overlapping events for this time slot
+              const overlappingEvents = dayEvents.filter(otherEvent => {
+                const eventStart = event.start_time || '00:00:00';
+                const eventEnd = event.end_time || '23:59:00';
+                const otherStart = otherEvent.start_time || '00:00:00';
+                const otherEnd = otherEvent.end_time || '23:59:00';
+                
+                return (
+                  (eventStart < otherEnd && eventEnd > otherStart) ||
+                  (otherStart < eventEnd && otherEnd > eventStart)
+                );
+              });
+              
+              const eventIndex = overlappingEvents.findIndex(e => e.id === event.id);
+              const position = getEventPosition(event, currentDate, overlappingEvents, eventIndex);
+              
+              // Skip if event doesn't occur on this date
+              if (!position) return null;
+              
               return (
                 <div
-                  key={idx}
+                  key={event.id || idx}
                   className="day-event"
                   style={{
                     top: `${position.top}px`,
                     height: `${position.height}px`,
+                    width: position.width,
+                    left: position.left,
                     backgroundColor: event.color || '#3498db'
                   }}
                   onClick={() => onEventClick && onEventClick(event)}
+                  title={position.isMultiDay ? 
+                    `Multi-day event: ${new Date(event.start_date).toLocaleDateString('vi-VN')} - ${new Date(event.end_date).toLocaleDateString('vi-VN')}` : 
+                    event.title
+                  }
                 >
-                  <div className="event-title">{event.title}</div>
+                  <div className="event-title">
+                    {event.title}
+                    {position.isMultiDay && (
+                      <span className="multi-day-indicator">
+                        {position.isFirstDay && ' (Bắt đầu)'}
+                        {position.isLastDay && !position.isFirstDay && ' (Kết thúc)'}
+                        {!position.isFirstDay && !position.isLastDay && ' (Tiếp tục)'}
+                      </span>
+                    )}
+                  </div>
                   <div className="event-time">
-                    {event.start_time?.substring(0, 5)} - {event.end_time?.substring(0, 5)}
+                    {position.isMultiDay ? (
+                      position.isFirstDay ? `Từ ${event.start_time?.substring(0, 5)}` :
+                      position.isLastDay ? `Đến ${event.end_time?.substring(0, 5)}` :
+                      'Cả ngày'
+                    ) : (
+                      `${event.start_time?.substring(0, 5)} - ${event.end_time?.substring(0, 5)}`
+                    )}
                   </div>
                   <div className="event-creator">
-                    👤 {event.creator_name}
+                    👤 {event.creator_name || 'Unknown'}
                   </div>
                 </div>
               );
