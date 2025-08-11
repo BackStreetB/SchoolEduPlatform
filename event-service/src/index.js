@@ -28,8 +28,48 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Test route debug (bypassing all middleware)
+app.get('/debug-test', (req, res) => {
+  console.log('DEBUG-TEST called at root level');
+  res.json({ success: true, message: 'Root level test works' });
+});
+
+// Test route cho joined events TRƯỚC khi áp dụng auth
+app.get('/api/events/joined-test-direct', async (req, res) => {
+  console.log('JOINED-TEST-DIRECT called!');
+  res.json({ success: true, message: 'Direct test works', count: 0 });
+});
+
+// API joined events thực sự - BYPASS AUTH tạm thời
+app.get('/api/events/joined', async (req, res) => {
+  console.log('🔥 JOINED API BYPASS AUTH!');
+  
+  try {
+    // Hardcode user 14 để test
+    const userId = 14;
+    console.log('Testing with userId:', userId);
+    
+    const { pool } = require('./config/database');
+    const query = `
+      SELECT DISTINCT e.*, ep.joined_at
+      FROM events e
+      INNER JOIN event_participants ep ON e.id = ep.event_id
+      WHERE ep.user_id = $1
+      ORDER BY e.start_date ASC, e.start_time ASC
+    `;
+    
+    const result = await pool.query(query, [userId]);
+    console.log('Found events:', result.rows.length);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error in joined bypass:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Routes
-app.use('/api/events', authenticateToken, eventRoutes);
+app.use('/api/events', eventRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

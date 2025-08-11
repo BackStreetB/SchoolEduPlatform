@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   // Event Service
   EVENTS: `${API_BASE}/events`,
   EVENT_BY_ID: (id) => `${API_BASE}/events/${id}`,
+  EVENTS_JOINED: `${API_BASE}/events/joined`,
   
   // Diary Service
   DIARY: `${API_BASE}/diary`,

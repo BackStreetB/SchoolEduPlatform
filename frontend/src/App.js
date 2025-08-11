@@ -209,11 +209,18 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
       });
       
       if (response.ok) {
+        const joinedEvent = await response.json();
         showNotification('Đã tham gia sự kiện thành công!', 'success');
         fetchPublicEvents(); // Refresh danh sách
-        // Tự động cập nhật calendar
+        
+        // Tự động cập nhật calendar với dữ liệu mới
         if (onEventCreated) {
-          onEventCreated();
+          onEventCreated(joinedEvent);
+        }
+        
+        // Refresh calendar data immediately
+        if (window.fetchCalendarData) {
+          window.fetchCalendarData();
         }
       } else {
         const error = await response.json();
@@ -237,9 +244,15 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
       if (response.ok) {
         showNotification('Đã rời khỏi sự kiện thành công!', 'success');
         fetchPublicEvents(); // Refresh danh sách
+        
         // Tự động cập nhật calendar
         if (onEventCreated) {
           onEventCreated();
+        }
+        
+        // Refresh calendar data immediately
+        if (window.fetchCalendarData) {
+          window.fetchCalendarData();
         }
       } else {
         const error = await response.json();
@@ -3362,7 +3375,7 @@ function App() {
       if (!token) return;
 
               // Fetch events - chỉ lấy sự kiện mà user đã tham gia để hiển thị trên calendar
-      const eventsResponse = await fetch(`${API_ENDPOINTS.EVENTS}/joined`, {
+      const eventsResponse = await fetch(API_ENDPOINTS.EVENTS_JOINED, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

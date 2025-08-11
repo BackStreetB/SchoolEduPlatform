@@ -90,6 +90,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
     
+    // Validate id parameter
+    if (!id || isNaN(parseInt(id))) {
+      return res.status(400).json({ error: 'Invalid event ID' });
+    }
+    
     const query = 'SELECT * FROM events WHERE id = $1 AND user_id = $2';
     const result = await pool.query(query, [parseInt(id), userId]);
     
@@ -242,13 +247,62 @@ router.get('/public/all', authenticateToken, async (req, res) => {
   }
 });
 
-// Lấy sự kiện mà user đã tham gia (cho calendar)
-router.get('/joined', async (req, res) => {
+// Test API debug (temporary) - no auth
+router.get('/joined-test', (req, res) => {
+  console.log('JOINED-TEST API called!');
+  res.json({ success: true, message: 'Test API works', data: [] });
+});
+
+// Test API với debug chi tiết
+router.get('/joined-debug', authenticateToken, async (req, res) => {
+  console.log('=== JOINED DEBUG START ===');
+  console.log('req.user:', req.user);
+  console.log('req.user.id:', req.user.id, 'type:', typeof req.user.id);
+  
   try {
-    console.log('GET /joined called - bypassing auth for testing');
+    const userId = req.user.id;
+    console.log('About to query with userId:', userId);
     
-    // Tạm thời trả về array rỗng để test routing
-    res.json([]);
+    const query = `SELECT COUNT(*) as count FROM event_participants WHERE user_id = $1`;
+    const result = await pool.query(query, [userId]);
+    console.log('Query result:', result.rows[0]);
+    
+    res.json({ 
+      success: true, 
+      userId: userId,
+      userType: typeof userId,
+      eventCount: result.rows[0].count 
+    });
+  } catch (error) {
+    console.error('Error in joined-debug:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Lấy sự kiện mà user đã tham gia (cho calendar)
+router.get('/joined', authenticateToken, async (req, res) => {
+  console.log('=== JOINED API START ===');
+  try {
+    const userId = req.user.id;
+    console.log('Joined API - userId:', userId, 'type:', typeof userId);
+    
+    // Validate userId
+    if (!userId) {
+      console.error('Missing userId:', userId);
+      return res.status(400).json({ error: 'Missing user ID' });
+    }
+    
+    const query = `
+      SELECT DISTINCT e.*, ep.joined_at
+      FROM events e
+      INNER JOIN event_participants ep ON e.id = ep.event_id
+      WHERE ep.user_id = $1
+      ORDER BY e.start_date ASC, e.start_time ASC
+    `;
+    
+    const result = await pool.query(query, [parseInt(userId)]);
+    console.log('Joined events found:', result.rows.length);
+    res.json(result.rows);
   } catch (error) {
     console.error('Error fetching joined events:', error);
     res.status(500).json({ error: 'Lỗi lấy danh sách sự kiện đã tham gia' });
@@ -260,7 +314,11 @@ router.post('/:id/join', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const userName = req.user.name || `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || `User ${userId}`;
+    // Lấy tên user từ JWT token
+    let userName = req.user.name || `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim();
+    if (!userName || userName === ' ') {
+      userName = `User ${userId}`;
+    }
     
     // Kiểm tra sự kiện có tồn tại không
     const eventQuery = 'SELECT * FROM events WHERE id = $1';
@@ -287,7 +345,13 @@ router.post('/:id/join', authenticateToken, async (req, res) => {
     
     await pool.query(joinQuery, [id, userId, userName]);
     
-    res.json({ message: 'Đã tham gia sự kiện thành công' });
+    // Trả về thông tin sự kiện đã join
+    const eventWithParticipants = eventResult.rows[0];
+    
+    res.json({ 
+      message: 'Đã tham gia sự kiện thành công',
+      event: eventWithParticipants
+    });
   } catch (error) {
     console.error('Error joining event:', error);
     res.status(500).json({ error: 'Lỗi tham gia sự kiện' });
