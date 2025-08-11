@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import './timeline.css';
 import API_ENDPOINTS from './config/api';
 
 // Global helper functions
@@ -80,6 +81,8 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
       default: return '#3B82F6';
     }
   };
+
+
 
   useEffect(() => {
     fetchPublicEvents();
@@ -3248,6 +3251,32 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
   );
 };
 
+// Ngày lễ Việt Nam 2025
+const vietnamHolidays = {
+  '2025-01-01': 'Tết Dương lịch',
+  '2025-01-28': 'Tết Nguyên Đán (28/1)',
+  '2025-01-29': 'Tết Nguyên Đán (29/1)', 
+  '2025-01-30': 'Tết Nguyên Đán (30/1)',
+  '2025-01-31': 'Tết Nguyên Đán (31/1)',
+  '2025-02-01': 'Tết Nguyên Đán (1/2)',
+  '2025-02-02': 'Tết Nguyên Đán (2/2)',
+  '2025-04-18': 'Giỗ Tổ Hùng Vương',
+  '2025-04-30': 'Ngày Giải phóng miền Nam',
+  '2025-05-01': 'Ngày Quốc tế Lao động',
+  '2025-09-02': 'Ngày Quốc khánh'
+};
+
+// Function to check if date is holiday
+const getHoliday = (date) => {
+  // Fix timezone offset - sử dụng local date thay vì UTC
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
+  
+  return vietnamHolidays[dateStr];
+};
+
 // Main App Component
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -3382,6 +3411,7 @@ function App() {
       });
       if (eventsResponse.ok) {
         const eventsData = await eventsResponse.json();
+        console.log('🔥 Calendar events data received:', eventsData);
         
         setCalendarEvents(eventsData);
         
@@ -3527,6 +3557,41 @@ function App() {
     setSelectedDate(clickedDate);
     setSelectedDayEvents(dayEvents);
     setShowDayModal(true);
+  };
+
+  // Generate timeline hours (0-23)
+  const generateTimeline = () => {
+    const hours = [];
+    for (let i = 0; i < 24; i++) {
+      hours.push({
+        hour: i,
+        label: i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`,
+        time24: `${i.toString().padStart(2, '0')}:00`
+      });
+    }
+    return hours;
+  };
+
+  // Function to calculate event position in timeline
+  const getEventPosition = (event, timelineHeight = 960) => { // 24h * 40px = 960px
+    const startTime = event.start_time || '00:00:00';
+    const endTime = event.end_time || '23:59:00';
+    
+    const startHour = parseInt(startTime.split(':')[0]);
+    const startMinute = parseInt(startTime.split(':')[1]);
+    const endHour = parseInt(endTime.split(':')[0]);
+    const endMinute = parseInt(endTime.split(':')[1]);
+    
+    const startPosition = (startHour * 40) + (startMinute * 40 / 60);
+    const endPosition = (endHour * 40) + (endMinute * 40 / 60);
+    const height = Math.max(endPosition - startPosition, 20); // Minimum 20px height
+    
+    return {
+      top: startPosition,
+      height: height,
+      startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
+      endTime: `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`
+    };
   };
 
   const isDateInPast = (date) => {
@@ -4010,10 +4075,11 @@ function App() {
           new Date(diary.date).toDateString() === currentDate.toDateString()
         );
         
-        // Get primary event color for background
-        const primaryEvent = dayEvents.length > 0 ? dayEvents[0] : null;
-        const backgroundColor = primaryEvent ? getEventColor(primaryEvent.color) : 'transparent';
-        const hasMultipleEvents = dayEvents.length > 1;
+        // Bỏ màu background - calendar sạch như Google Calendar
+        const backgroundColor = 'transparent';
+        
+        // Check if this day is a holiday
+        const holiday = getHoliday(currentDate);
         
         days.push(
           <div 
@@ -4022,42 +4088,30 @@ function App() {
             onClick={() => handleDayClick(day)}
             style={{
               backgroundColor: backgroundColor,
-              color: backgroundColor !== 'transparent' ? 'white' : 'inherit',
+              color: 'inherit',
               position: 'relative'
             }}
           >
             <span className="day-number">{day}</span>
             {isToday && <div className="today-label">Hôm nay</div>}
             
-            {/* Event indicators */}
+            {/* Holiday indicator */}
+            {holiday && (
+              <div className="holiday-indicator" title={holiday}>
+                🎉
+              </div>
+            )}
+            
+            {/* Events count indicator */}
             {dayEvents.length > 0 && (
-              <div className="day-events">
-                {dayEvents.slice(0, 2).map((event, index) => (
-                  <div 
-                    key={`event-${event.id}-${index}`}
-                    className="event-dot"
-                    style={{ 
-                      backgroundColor: hasMultipleEvents ? getEventColor(event.color) : 'rgba(255,255,255,0.8)',
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      margin: '1px',
-                      display: 'inline-block'
-                    }}
-                    title={`${event.title}`}
-                  ></div>
-                ))}
-                {hasMultipleEvents && (
-                  <span className="event-count">+{dayEvents.length - 2}</span>
-                )}
+              <div className="events-count" title={`${dayEvents.length} sự kiện`}>
+                {dayEvents.length}
               </div>
             )}
             
             {/* Diary indicator */}
             {dayDiaries.length > 0 && (
-              <div className="diary-indicator" title={`${dayDiaries.length} nhật ký`}>
-                📝
-              </div>
+              <span className="diary-indicator" title="Có nhật ký 📝">📝</span>
             )}
           </div>
         );
@@ -4288,63 +4342,151 @@ function App() {
       {/* Day Click Modal */}
       {showDayModal && (
         <div className="modal-overlay" onClick={closeDayModal}>
-          <div className="day-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-                              <h3>Ngày {selectedDate ? `${selectedDate.getDate().toString().padStart(2, '0')}/${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}/${selectedDate.getFullYear()}` : ''}</h3>
+          <div className="timeline-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="timeline-header">
+              <h3>
+                📅 {selectedDate ? selectedDate.toLocaleDateString('vi-VN', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                }) : ''}
+                {selectedDate && getHoliday(selectedDate) && (
+                  <span className="holiday-name"> - 🎉 {getHoliday(selectedDate)}</span>
+                )}
+              </h3>
               <button className="modal-close" onClick={closeDayModal}>×</button>
             </div>
-            <div className="modal-content">
-              {/* Hiển thị sự kiện nếu có */}
-              {selectedDayEvents.length > 0 && (
-                <div className="day-events-section">
-                  <h4>📅 Sự kiện trong ngày</h4>
-                  <div className="events-list">
-                    {selectedDayEvents.map((event, index) => (
-                      <div key={event.id} className="event-item" style={{ borderLeft: `4px solid ${getEventColor(event.color)}` }}>
-                        <div className="event-header">
-                          <span className="event-title">{event.title}</span>
-                          <span className="event-time">
-                            {event.start_time && event.end_time ? 
-                              `${formatTime(event.start_time)} - ${formatTime(event.end_time)}` : 
-                              'Cả ngày'
-                            }
-                          </span>
+            <div className="timeline-content">
+              {/* Timeline Hours */}
+              <div className="timeline-hours">
+                {generateTimeline().map((timeSlot) => (
+                  <div key={timeSlot.hour} className="hour-line">
+                    <div className="hour-label">{timeSlot.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Timeline Events */}
+              <div className="timeline-events">
+                {selectedDayEvents.map((event, index) => {
+                  const position = getEventPosition(event);
+                  return (
+                    <div 
+                      key={event.id} 
+                      className="timeline-event-item"
+                      style={{
+                        top: `${position.top}px`,
+                        height: `${position.height}px`,
+                        backgroundColor: getEventColor(event.color),
+                        left: '60px',
+                        right: '20px',
+                        position: 'absolute',
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        color: 'white',
+                        fontSize: '12px',
+                        overflow: 'hidden',
+                        zIndex: 10
+                      }}
+                    >
+                      <div className="timeline-event-content">
+                        <strong>{event.title}</strong>
+                        <div className="timeline-event-time">
+                          {formatTime(event.start_time)} - {formatTime(event.end_time)}
                         </div>
                         {event.creator_name && (
-                          <div className="event-creator">Tạo bởi: {event.creator_name}</div>
-                        )}
-                        {event.description && (
-                          <div className="event-description">{event.description}</div>
+                          <div className="timeline-event-creator">
+                            👤 {event.creator_name}
+                          </div>
                         )}
                       </div>
-                    ))}
+                    </div>
+                  );
+                })}
+
+                {/* Current Time Indicator (nếu là hôm nay) */}
+                {selectedDate && new Date(selectedDate).toDateString() === new Date().toDateString() && (
+                  <div 
+                    className="current-time-indicator"
+                    style={{
+                      top: `${(new Date().getHours() * 40) + (new Date().getMinutes() * 40 / 60)}px`,
+                      position: 'absolute',
+                      left: '50px',
+                      right: '10px',
+                      height: '2px',
+                      backgroundColor: '#ff4757',
+                      zIndex: 100
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute',
+                      left: '-8px',
+                      top: '-4px',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ff4757'
+                    }}></div>
                   </div>
+                )}
+              </div>
+
+              {/* Tạo sự kiện mới cho ngày này (nếu không phải ngày quá khứ) */}
+              {!isDateInPast(selectedDate) && (
+                <div className="timeline-actions" style={{ 
+                  position: 'absolute', 
+                  bottom: '20px', 
+                  left: '20px', 
+                  right: '20px',
+                  display: 'flex',
+                  gap: '10px',
+                  justifyContent: 'center'
+                }}>
+                  <button 
+                    className="modal-btn event-btn" 
+                    onClick={handleCreateEvent}
+                    style={{
+                      background: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📅 Tạo sự kiện
+                  </button>
+                  <button 
+                    className="modal-btn diary-btn"
+                    onClick={handleCreateDiary}
+                    style={{
+                      background: '#2ecc71',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📝 Viết nhật ký
+                  </button>
                 </div>
               )}
-              
-              {/* Hiển thị tùy chọn tạo mới nếu chưa có sự kiện hoặc ngày chưa qua */}
-              {selectedDayEvents.length === 0 && !isDateInPast(selectedDate) && (
-                <div className="create-options">
-                  <h4>Bạn muốn tạo gì?</h4>
-                  <button className="modal-btn event-btn" onClick={handleCreateEvent}>
-                    <span className="btn-icon">📅</span>
-                    <span className="btn-text">Tạo sự kiện</span>
-                  </button>
-                  <button className="modal-btn diary-btn" onClick={handleCreateDiary}>
-                    <span className="btn-icon">📝</span>
-                    <span className="btn-text">Viết nhật ký</span>
-                  </button>
-                </div>
-              )}
-              
-              {/* Hiển thị thông báo nếu ngày đã qua và không có sự kiện */}
+
+              {/* Thông báo ngày quá khứ không có sự kiện */}
               {selectedDayEvents.length === 0 && isDateInPast(selectedDate) && (
-                <div className="past-date-message">
-                  <div className="message-icon">👁️</div>
-                  <div className="message-text">
-                    <h4>Chỉ xem được</h4>
-                    <p>Ngày này đã qua và không có sự kiện nào</p>
-                  </div>
+                <div className="no-events-timeline" style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  textAlign: 'center',
+                  color: '#666'
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '10px' }}>👁️</div>
+                  <h4>Chỉ xem được</h4>
+                  <p>Ngày này đã qua và không có sự kiện nào</p>
                 </div>
               )}
             </div>

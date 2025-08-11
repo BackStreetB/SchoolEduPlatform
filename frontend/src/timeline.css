@@ -1,0 +1,218 @@
+/* Holiday and Events indicators */
+.holiday-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+}
+
+.events-count {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  background: #3B82F6;
+  color: white;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* Timeline Modal */
+.timeline-modal {
+  background: white;
+  border-radius: 16px;
+  width: 90vw;
+  max-width: 1000px;
+  height: 80vh;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+}
+
+.timeline-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+}
+
+.timeline-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.holiday-name {
+  color: #ef4444;
+  font-weight: normal;
+}
+
+.timeline-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.timeline-sidebar {
+  width: 80px;
+  background: #f8fafc;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+}
+
+.time-slot {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.time-label {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.timeline-content {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+}
+
+.timeline-grid {
+  position: relative;
+  height: 960px; /* 24 hours * 40px */
+  background: #ffffff;
+}
+
+.hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #e5e7eb;
+  z-index: 1;
+}
+
+.timeline-event {
+  position: absolute;
+  right: 8px;
+  left: 8px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.timeline-event:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  z-index: 20 !important;
+}
+
+.event-title-timeline {
+  font-weight: 600;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-time-timeline {
+  font-size: 10px;
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+
+.event-description-timeline {
+  font-size: 10px;
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.current-time-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+}
+
+.current-time-dot {
+  width: 12px;
+  height: 12px;
+  background: #ef4444;
+  border-radius: 50%;
+  margin-left: -6px;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.current-time-label {
+  background: #ef4444;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.timeline-actions {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  display: flex;
+  gap: 12px;
+}
+
+.timeline-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.timeline-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.timeline-btn.event-btn:hover {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.timeline-btn.diary-btn:hover {
+  background: #dcfce7;
+  border-color: #10b981;
+  color: #047857;
+}

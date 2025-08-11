@@ -40,12 +40,12 @@ app.get('/api/events/joined-test-direct', async (req, res) => {
   res.json({ success: true, message: 'Direct test works', count: 0 });
 });
 
-// API joined events thực sự - BYPASS AUTH tạm thời
+// API joined events thực sự - BYPASS AUTH nhưng accept headers
 app.get('/api/events/joined', async (req, res) => {
-  console.log('🔥 JOINED API BYPASS AUTH!');
+  console.log('🔥 JOINED API BYPASS AUTH - WITH HEADERS!');
   
   try {
-    // Hardcode user 14 để test
+    // Hardcode user 14 để test (sẽ fix auth sau)
     const userId = 14;
     console.log('Testing with userId:', userId);
     
