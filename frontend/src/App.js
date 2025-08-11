@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import API_ENDPOINTS from './config/api';
 
 // Global helper functions
 const isImage = (fileName) => {
@@ -36,6 +37,16 @@ const formatDateForInput = (dateString) => {
   return `${year}-${month}-${day}`;
 };
 
+// Helper function để format time từ HH:MM:SS thành HH:MM
+const formatTime = (timeString) => {
+  if (!timeString) return '';
+  // Nếu là format HH:MM:SS, cắt bỏ giây
+  if (timeString.includes(':') && timeString.split(':').length === 3) {
+    return timeString.substring(0, 5); // Lấy HH:MM
+  }
+  return timeString;
+};
+
 // Events Component
 const EventsComponent = ({ onEventCreated, showNotification }) => {
   const [events, setEvents] = useState([]);
@@ -46,6 +57,8 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [viewingEvent, setViewingEvent] = useState(null);
   const [showPublicEvents, setShowPublicEvents] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [selectedEventParticipants, setSelectedEventParticipants] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -74,7 +87,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch('http://localhost:3005/api/events', {
+      const response = await fetch(API_ENDPOINTS.EVENTS, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
@@ -90,7 +103,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
 
   const fetchPublicEvents = async () => {
     try {
-      const response = await fetch('http://localhost:3005/api/events/public/all', {
+      const response = await fetch(`${API_ENDPOINTS.EVENTS}/public/all`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
@@ -119,7 +132,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
     console.log('Creating event with data:', formData);
     
     try {
-      const response = await fetch('http://localhost:3005/api/events', {
+      const response = await fetch(API_ENDPOINTS.EVENTS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +180,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
     if (!window.confirm('Bạn có chắc muốn xóa sự kiện này?')) return;
     
     try {
-      const response = await fetch(`http://localhost:3005/api/events/${eventId}`, {
+      const response = await fetch(`${API_ENDPOINTS.EVENTS}/${eventId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -188,7 +201,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
 
   const handleJoinEvent = async (eventId) => {
     try {
-      const response = await fetch(`http://localhost:3005/api/events/${eventId}/join`, {
+      const response = await fetch(`${API_ENDPOINTS.EVENTS}/${eventId}/join`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -214,7 +227,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
 
   const handleLeaveEvent = async (eventId) => {
     try {
-      const response = await fetch(`http://localhost:3005/api/events/${eventId}/leave`, {
+      const response = await fetch(`${API_ENDPOINTS.EVENTS}/${eventId}/leave`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -265,11 +278,35 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
     setShowEditForm(true);
   };
 
+  const openParticipantsList = async (event) => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.EVENTS}/${event.id}/participants`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+      
+      if (response.ok) {
+        const participants = await response.json();
+        setSelectedEventParticipants(participants);
+        setShowParticipantsModal(true);
+      } else {
+        console.error('Error fetching participants:', response.status);
+        setSelectedEventParticipants(event.participants || []);
+        setShowParticipantsModal(true);
+      }
+    } catch (error) {
+      console.error('Error fetching participants:', error);
+      setSelectedEventParticipants(event.participants || []);
+      setShowParticipantsModal(true);
+    }
+  };
+
   const handleEditEvent = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3005/api/events/${editingEvent.id}`, {
+      const response = await fetch(`${API_ENDPOINTS.EVENTS}/${editingEvent.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -634,10 +671,10 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
                 
                 <div className="event-date">
                   <strong>Từ:</strong> {formatDate(event.start_date)}
-                  {event.start_time && ` ${event.start_time}`}
+                  {event.start_time && ` ${formatTime(event.start_time)}`}
                   <br />
                   <strong>Đến:</strong> {formatDate(event.end_date)}
-                  {event.end_time && ` ${event.end_time}`}
+                  {event.end_time && ` ${formatTime(event.end_time)}`}
                 </div>
                 
                 {event.description && (
@@ -646,11 +683,25 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
                   </div>
                 )}
                 
-                {event.participants && event.participants.length > 0 && (
-                  <div className="event-participants">
-                    <strong>Người tham gia:</strong> {event.participants.length} người
-                  </div>
-                )}
+                <div className="event-participants">
+                  <strong>Người tham gia:</strong> {event.participants ? event.participants.length : 0} người
+                  <button 
+                    className="btn-participants" 
+                    onClick={() => openParticipantsList(event)}
+                    title="Xem danh sách người tham gia"
+                    style={{
+                      marginLeft: '10px',
+                      padding: '2px 8px',
+                      fontSize: '12px',
+                      backgroundColor: '#f0f0f0',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    👥 Danh sách
+                  </button>
+                </div>
                 
                 <div className="event-actions">
                   <button 
@@ -703,6 +754,41 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
           })
         )}
       </div>
+
+      {/* Modal hiển thị danh sách người tham gia */}
+      {showParticipantsModal && (
+        <div className="modal-overlay">
+          <div className="modal-content participants-modal">
+            <div className="modal-header">
+              <h3>👥 Danh sách người tham gia</h3>
+              <button 
+                className="modal-close" 
+                onClick={() => setShowParticipantsModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              {selectedEventParticipants.length > 0 ? (
+                <div className="participants-list">
+                  {selectedEventParticipants.map((participant, index) => (
+                    <div key={index} className="participant-item">
+                      <div className="participant-info">
+                        <span className="participant-name">{participant.user_name}</span>
+                        <span className="participant-date">
+                          Tham gia: {new Date(participant.joined_at).toLocaleDateString('vi-VN')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-participants">Chưa có người tham gia nào.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -727,7 +813,7 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
 
   const fetchDiaries = async () => {
     try {
-      const response = await fetch('http://localhost:3003/api/diary', {
+      const response = await fetch(API_ENDPOINTS.DIARY, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
@@ -745,7 +831,7 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3003/api/diary', {
+      const response = await fetch(API_ENDPOINTS.DIARY, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -781,7 +867,7 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3003/api/diary/${editingDiary.id}`, {
+      const response = await fetch(`${API_ENDPOINTS.DIARY}/${editingDiary.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -815,7 +901,7 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
     if (!window.confirm('Bạn có chắc muốn xóa nhật ký này?')) return;
     
     try {
-      const response = await fetch(`http://localhost:3003/api/diary/${diaryId}`, {
+      const response = await fetch(`${API_ENDPOINTS.DIARY}/${diaryId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -1145,7 +1231,7 @@ const CommunityComponent = ({
 
       console.log('Fetching posts with token:', token.substring(0, 20) + '...');
       
-      const response = await fetch('http://localhost:3004/api/community', {
+      const response = await fetch(API_ENDPOINTS.COMMUNITY, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Cache-Control': 'no-cache',
@@ -1203,7 +1289,7 @@ const CommunityComponent = ({
         formDataToSend.append('media', file);
       });
 
-      const response = await fetch('http://localhost:3004/api/community', {
+      const response = await fetch(API_ENDPOINTS.COMMUNITY, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -1243,7 +1329,7 @@ const CommunityComponent = ({
     if (!window.confirm('Bạn có chắc muốn xóa bài viết này?')) return;
     
     try {
-      const response = await fetch(`http://localhost:3004/api/community/${postId}`, {
+      const response = await fetch(`${API_ENDPOINTS.COMMUNITY}/${postId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -1282,7 +1368,7 @@ const CommunityComponent = ({
         return {
           id: media.id,
           name: fileName,
-          preview: `http://localhost:3004/uploads/${encodedFileName}${cacheBuster}`,
+          preview: `${API_ENDPOINTS.COMMUNITY_UPLOADS}/${encodedFileName}${cacheBuster}`,
           type: isImage(fileName) ? 'image' : isVideo(fileName) ? 'video' : 'unknown',
           isExisting: true,
           originalMedia: media
@@ -1330,7 +1416,7 @@ const CommunityComponent = ({
         formDataToSend.append('media', file);
       });
 
-      const response = await fetch(`http://localhost:3004/api/community/${editingPost.id}`, {
+      const response = await fetch(`${API_ENDPOINTS.COMMUNITY}/${editingPost.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -1419,7 +1505,7 @@ const CommunityComponent = ({
   const fetchReactionDetails = async (postId) => {
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`http://localhost:3004/api/community/${postId}/reactions`, {
+      const response = await fetch(`${API_ENDPOINTS.COMMUNITY_REACTIONS(postId)}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1473,7 +1559,7 @@ const CommunityComponent = ({
 
       if (reactionType) {
         // Add reaction
-        const response = await fetch(`http://localhost:3004/api/community/${postId}/reactions`, {
+        const response = await fetch(`${API_ENDPOINTS.COMMUNITY_REACTIONS(postId)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1518,7 +1604,7 @@ const CommunityComponent = ({
         }
       } else {
         // Remove reaction
-        const response = await fetch(`http://localhost:3004/api/community/${postId}/reactions`, {
+        const response = await fetch(`${API_ENDPOINTS.COMMUNITY_REACTIONS(postId)}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -1563,12 +1649,13 @@ const CommunityComponent = ({
     } catch (error) {
       console.error('Error handling reaction:', error);
       // Revert optimistic update on error
+      const currentPost = posts.find(post => post.id === postId);
       setPosts(prevPosts => 
         prevPosts.map(post => 
           post.id === postId 
             ? { 
                 ...post, 
-                userReaction: hadReaction // Revert to previous state
+                userReaction: currentPost?.userReaction // Revert to previous state
               }
             : post
         )
@@ -1634,7 +1721,7 @@ const CommunityComponent = ({
         )
       );
 
-      const response = await fetch(`http://localhost:3004/api/community/${postId}/comments`, {
+      const response = await fetch(`${API_ENDPOINTS.COMMUNITY_COMMENTS(postId)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1702,7 +1789,7 @@ const CommunityComponent = ({
         )
       );
 
-      const response = await fetch(`http://localhost:3004/api/community/comments/${commentId}`, {
+      const response = await fetch(`${API_ENDPOINTS.COMMUNITY_COMMENT_BY_ID(commentId)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1770,7 +1857,7 @@ const CommunityComponent = ({
         )
       );
 
-      const response = await fetch(`http://localhost:3004/api/community/comments/${commentId}`, {
+      const response = await fetch(`${API_ENDPOINTS.COMMUNITY_COMMENT_BY_ID(commentId)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1800,7 +1887,11 @@ const CommunityComponent = ({
               ...p, 
               comments: p.comments.map(c => 
                 c.id === commentId 
-                  ? { ...c, isEditing: !c.isEditing }
+                  ? { 
+                      ...c, 
+                      isEditing: !c.isEditing,
+                      editContent: !c.isEditing ? c.content : undefined // Khởi tạo editContent với nội dung hiện tại
+                    }
                   : c
               )
             }
@@ -2196,11 +2287,11 @@ const CommunityComponent = ({
                     <div key={media.id || index} className="media-item">
                       {media.file_type === 'image' ? (
                         <img 
-                          src={`http://localhost:3004/uploads/${encodeURIComponent(media.file_name)}?t=${Date.now()}`} 
+                          src={`${API_ENDPOINTS.COMMUNITY_UPLOADS}/${encodeURIComponent(media.file_name)}?t=${Date.now()}`} 
                           alt={media.file_name}
                           className="post-image"
                           crossOrigin="anonymous"
-                          onClick={() => openImageModal(`http://localhost:3004/uploads/${encodeURIComponent(media.file_name)}?t=${Date.now()}`, media.file_name)}
+                          onClick={() => openImageModal(`${API_ENDPOINTS.COMMUNITY_UPLOADS}/${encodeURIComponent(media.file_name)}?t=${Date.now()}`, media.file_name)}
                           style={{ cursor: 'pointer' }}
                           onError={(e) => {
                             console.error('Image load error:', e.target.src);
@@ -2220,9 +2311,9 @@ const CommunityComponent = ({
                           onLoadStart={() => console.log('Video loading started:', media.file_name)}
                           onCanPlay={() => console.log('Video can play:', media.file_name)}
                         >
-                          <source src={`http://localhost:3004/uploads/${encodeURIComponent(media.file_name)}?t=${Date.now()}`} type="video/mp4" />
-                          <source src={`http://localhost:3004/uploads/${encodeURIComponent(media.file_name)}?t=${Date.now()}`} type="video/webm" />
-                          <source src={`http://localhost:3004/uploads/${encodeURIComponent(media.file_name)}?t=${Date.now()}`} type="video/ogg" />
+                                                  <source src={`${API_ENDPOINTS.COMMUNITY_UPLOADS}/${encodeURIComponent(media.file_name)}?t=${Date.now()}`} type="video/mp4" />
+                        <source src={`${API_ENDPOINTS.COMMUNITY_UPLOADS}/${encodeURIComponent(media.file_name)}?t=${Date.now()}`} type="video/webm" />
+                        <source src={`${API_ENDPOINTS.COMMUNITY_UPLOADS}/${encodeURIComponent(media.file_name)}?t=${Date.now()}`} type="video/ogg" />
                           Your browser does not support the video tag.
                         </video>
                       )}
@@ -2338,7 +2429,7 @@ const CommunityComponent = ({
                             <div className="comment-edit-form">
                               <input
                                 type="text"
-                                value={comment.editContent || comment.content}
+                                value={comment.editContent !== undefined ? comment.editContent : comment.content}
                                 onChange={(e) => {
                                   setPosts(prevPosts => 
                                     prevPosts.map(p => 
@@ -2357,7 +2448,7 @@ const CommunityComponent = ({
                                 }}
                                 onKeyPress={(e) => {
                                   if (e.key === 'Enter') {
-                                    handleEditComment(post.id, comment.id, comment.editContent || comment.content);
+                                    handleEditComment(post.id, comment.id, comment.editContent !== undefined ? comment.editContent : comment.content);
                                   }
                                 }}
                                 autoFocus
@@ -2365,7 +2456,7 @@ const CommunityComponent = ({
                               <div className="edit-actions">
                                 <button 
                                   className="btn-save"
-                                  onClick={() => handleEditComment(post.id, comment.id, comment.editContent || comment.content)}
+                                  onClick={() => handleEditComment(post.id, comment.id, comment.editContent !== undefined ? comment.editContent : comment.content)}
                                 >
                                   💾
                                 </button>
@@ -2573,7 +2664,7 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
         return;
       }
 
-      const response = await fetch(`http://localhost:3006/api/profile/me`, {
+      const response = await fetch(API_ENDPOINTS.PROFILE_ME, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
@@ -2645,7 +2736,7 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
       console.log('Changing password for user:', currentUser?.id);
       console.log('Token:', localStorage.getItem('accessToken'));
       
-      const response = await fetch('/api/auth/auth/change-password', {
+              const response = await fetch(API_ENDPOINTS.AUTH_CHANGE_PASSWORD, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2713,14 +2804,14 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
       }
       
       console.log('Sending profile data:', processedData);
-      console.log('Request URL:', `http://localhost:3006/api/profile`);
+              console.log('Request URL:', API_ENDPOINTS.PROFILE);
       console.log('Request headers:', {
         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
       });
       
       // Test connection to teacher service first
       try {
-        const testResponse = await fetch('http://localhost:3006/health', {
+        const testResponse = await fetch(API_ENDPOINTS.TEACHER_HEALTH, {
           method: 'GET'
         });
         console.log('Teacher service health check:', testResponse.status);
@@ -2736,7 +2827,7 @@ const ProfileComponent = ({ userId, onClose, setUser, currentUser, showNotificat
       
       let response;
       try {
-        response = await fetch(`http://localhost:3006/api/profile`, {
+        response = await fetch(API_ENDPOINTS.PROFILE, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
@@ -3274,17 +3365,18 @@ function App() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      // Fetch events
-      const eventsResponse = await fetch('http://localhost:3005/api/events/public/all', {
+              // Fetch events - chỉ lấy sự kiện mà user đã tham gia để hiển thị trên calendar
+      const eventsResponse = await fetch(`${API_ENDPOINTS.EVENTS}/joined`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       if (eventsResponse.ok) {
         const eventsData = await eventsResponse.json();
+        
         setCalendarEvents(eventsData);
         
-        // Calculate today's activities
+        // Calculate today's activities (chỉ tính sự kiện đã tham gia)
         const today = new Date().toISOString().split('T')[0];
         const todayEvents = eventsData.filter(event => {
           const eventStart = new Date(event.start_date);
@@ -3299,7 +3391,7 @@ function App() {
       }
 
       // Fetch diaries
-      const diariesResponse = await fetch('http://localhost:3003/api/diary', {
+      const diariesResponse = await fetch(`${API_ENDPOINTS.DIARY}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -3318,7 +3410,7 @@ function App() {
       }
 
       // Fetch community posts
-      const postsResponse = await fetch('http://localhost:3004/api/community', {
+      const postsResponse = await fetch(`${API_ENDPOINTS.COMMUNITY}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -3466,7 +3558,7 @@ function App() {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/auth/me', {
+              const response = await fetch(API_ENDPOINTS.AUTH_PROFILE, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
@@ -3477,7 +3569,7 @@ function App() {
         
         // Fetch profile data after authentication
         try {
-          const profileResponse = await fetch(`http://localhost:3006/api/profile/me`, {
+          const profileResponse = await fetch(API_ENDPOINTS.PROFILE_ME, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
             }
@@ -3542,7 +3634,7 @@ function App() {
       const first_name = nameParts[0] || '';
       const last_name = nameParts.slice(1).join(' ') || '';
       
-      const response = await fetch('/api/auth/auth/register', {
+              const response = await fetch(API_ENDPOINTS.AUTH_REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -3590,7 +3682,7 @@ function App() {
     setError('');
     
     try {
-      const response = await fetch('/api/auth/auth/login', {
+              const response = await fetch(API_ENDPOINTS.AUTH_LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -3758,7 +3850,7 @@ function App() {
               onClick={async () => {
                 try {
                   setLoading(true);
-                  const res = await fetch('/api/auth/auth/forgot-password', {
+                  const res = await fetch(API_ENDPOINTS.AUTH_FORGOT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: forgotEmail })
@@ -3998,7 +4090,6 @@ function App() {
         <div className="dashboard-content">
           <div className="dashboard-left">
             <div className="welcome-banner compact">
-              <h2>Chào mừng, {user?.gender === 'Nam' ? 'thầy giáo' : user?.gender === 'Nữ' ? 'cô giáo' : ''} {user?.first_name} {user?.last_name}!</h2>
               <p className="current-time">{today.toLocaleDateString('vi-VN', { 
                 weekday: 'long'
               })} {today.getDate().toString().padStart(2, '0')}/{(today.getMonth() + 1).toString().padStart(2, '0')}/{today.getFullYear()} - {today.toLocaleTimeString('vi-VN')}</p>
@@ -4205,7 +4296,7 @@ function App() {
                           <span className="event-title">{event.title}</span>
                           <span className="event-time">
                             {event.start_time && event.end_time ? 
-                              `${event.start_time} - ${event.end_time}` : 
+                              `${formatTime(event.start_time)} - ${formatTime(event.end_time)}` : 
                               'Cả ngày'
                             }
                           </span>

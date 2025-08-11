@@ -14,10 +14,8 @@ const initializeDatabase = async () => {
     await pool.query('SELECT NOW()');
     console.log('Connected to PostgreSQL database');
 
-    // Drop existing table if exists and recreate
-    await pool.query('DROP TABLE IF EXISTS teacher_profiles CASCADE');
-
-    // Create teacher_profiles table
+    // Create teacher_profiles table (only if not exists)
+    // DO NOT DROP - this was causing data loss!
     const createTableQuery = `
       CREATE TABLE IF NOT EXISTS teacher_profiles (
         id SERIAL PRIMARY KEY,

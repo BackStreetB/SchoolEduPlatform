@@ -951,6 +951,107 @@ router.get('/:id/reactions', authenticateToken, async (req, res) => {
   }
 });
 
+// Cập nhật comment
+router.put('/comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.id;
+    
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Nội dung comment không được để trống' });
+    }
+    
+    // Kiểm tra comment tồn tại và thuộc về user
+    const checkQuery = 'SELECT * FROM comments WHERE id = $1 AND user_id = $2';
+    const checkResult = await pool.query(checkQuery, [commentId, userId]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy comment hoặc không có quyền chỉnh sửa' });
+    }
+    
+    // Cập nhật comment
+    const updateQuery = `
+      UPDATE comments 
+      SET content = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2 AND user_id = $3
+      RETURNING *
+    `;
+    
+    const result = await pool.query(updateQuery, [content.trim(), commentId, userId]);
+    
+    // Lấy thông tin author
+    let authorName = `User ${userId}`;
+    let authorEmail = '';
+    
+    try {
+      // Try to get from teacher_profiles first
+      const teacherQuery = 'SELECT first_name, last_name FROM teacher_profiles WHERE user_id = $1';
+      const teacherResult = await pool.query(teacherQuery, [userId]);
+      
+      if (teacherResult.rows.length > 0) {
+        const teacher = teacherResult.rows[0];
+        authorName = `${teacher.first_name} ${teacher.last_name}`.trim();
+      } else {
+        // Fallback to users table
+        const userQuery = 'SELECT first_name, last_name, email FROM users WHERE id = $1';
+        const userResult = await pool.query(userQuery, [userId]);
+        
+        if (userResult.rows.length > 0) {
+          const user = userResult.rows[0];
+          authorName = user.first_name && user.last_name ? 
+            `${user.first_name} ${user.last_name}`.trim() : 
+            `User ${userId}`;
+          authorEmail = user.email || '';
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user info for updated comment:', error);
+      authorName = req.user.name || `User ${userId}`;
+      authorEmail = req.user.email || '';
+    }
+    
+    const updatedComment = {
+      ...result.rows[0],
+      author_name: authorName,
+      author_email: authorEmail
+    };
+    
+    res.json(updatedComment);
+  } catch (error) {
+    console.error('Error updating comment:', error);
+    res.status(500).json({ error: 'Lỗi cập nhật comment' });
+  }
+});
+
+// Xóa comment
+router.delete('/comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.user.id;
+    
+    // Kiểm tra comment tồn tại và thuộc về user
+    const checkQuery = 'SELECT * FROM comments WHERE id = $1 AND user_id = $2';
+    const checkResult = await pool.query(checkQuery, [commentId, userId]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy comment hoặc không có quyền xóa' });
+    }
+    
+    // Xóa comment
+    const deleteQuery = 'DELETE FROM comments WHERE id = $1 AND user_id = $2 RETURNING *';
+    const result = await pool.query(deleteQuery, [commentId, userId]);
+    
+    res.json({ 
+      message: 'Đã xóa comment thành công',
+      deletedComment: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ error: 'Lỗi xóa comment' });
+  }
+});
+
 // Serve uploaded files
 router.get('/uploads/:filename', (req, res) => {
   const { filename } = req.params;

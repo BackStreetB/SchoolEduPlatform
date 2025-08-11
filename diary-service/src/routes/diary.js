@@ -9,15 +9,16 @@ router.post('/', authenticateToken, async (req, res) => {
     const { title, content } = req.body;
     const userId = req.user.id;
     
-    // Không cần trường date, chỉ sử dụng created_at
+    // Thêm trường date cùng với created_at
+    const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
     const query = `
-      INSERT INTO diary_entries (user_id, title, content, created_at)
-      VALUES ($1, $2, $3, NOW())
+      INSERT INTO diary_entries (user_id, title, content, date, created_at)
+      VALUES ($1, $2, $3, $4, NOW())
       RETURNING *
     `;
     
     const result = await pool.query(query, [
-      userId, title, content
+      userId, title, content, today
     ]);
     
     res.status(201).json(result.rows[0]);
@@ -82,13 +83,12 @@ router.put('/:id', authenticateToken, async (req, res) => {
     
     const diary = diaryResult.rows[0];
     
-    // Sử dụng created_at thay vì date vì database không có trường date riêng
-    const diaryDate = new Date(diary.created_at).toISOString().split('T')[0];
+    // Sử dụng trường date để so sánh
+    const diaryDate = diary.date instanceof Date ? diary.date.toISOString().split('T')[0] : diary.date;
     const today = new Date().toISOString().split('T')[0];
     
     console.log('Debug diary edit:', {
       diaryId: id,
-      diaryCreatedAt: diary.created_at,
       diaryDate: diaryDate,
       today: today,
       canEdit: diaryDate === today
@@ -135,13 +135,12 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     
     const diary = diaryResult.rows[0];
     
-    // Sử dụng created_at thay vì date vì database không có trường date riêng
-    const diaryDate = new Date(diary.created_at).toISOString().split('T')[0];
+    // Sử dụng trường date để so sánh
+    const diaryDate = diary.date instanceof Date ? diary.date.toISOString().split('T')[0] : diary.date;
     const today = new Date().toISOString().split('T')[0];
     
     console.log('Debug diary delete:', {
       diaryId: id,
-      diaryCreatedAt: diary.created_at,
       diaryDate: diaryDate,
       today: today,
       canDelete: diaryDate === today

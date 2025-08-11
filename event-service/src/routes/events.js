@@ -3,6 +3,24 @@ const router = express.Router();
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
+// Helper function để lấy user name từ auth database
+async function getUserName(userId) {
+  try {
+    const authPool = require('../config/authDatabase');
+    const query = 'SELECT first_name, last_name FROM users WHERE id = $1';
+    const result = await authPool.query(query, [userId]);
+    
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+      return `${user.first_name || ''} ${user.last_name || ''}`.trim() || `User ${userId}`;
+    }
+    return `User ${userId}`;
+  } catch (error) {
+    console.log('Error fetching user name:', error);
+    return `User ${userId}`;
+  }
+}
+
 // Tạo sự kiện mới
 router.post('/', authenticateToken, async (req, res) => {
   try {
@@ -73,7 +91,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     
     const query = 'SELECT * FROM events WHERE id = $1 AND user_id = $2';
-    const result = await pool.query(query, [id, userId]);
+    const result = await pool.query(query, [parseInt(id), userId]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Không tìm thấy sự kiện' });
@@ -181,11 +199,11 @@ router.get('/today/current', authenticateToken, async (req, res) => {
   }
 });
 
-// Lấy tất cả sự kiện công khai (đơn giản hóa, không JOIN với users)
+// Lấy tất cả sự kiện công khai 
 router.get('/public/all', authenticateToken, async (req, res) => {
   try {
     const query = `
-      SELECT e.*, 
+      SELECT e.*,
              ep.user_id as participant_user_id,
              ep.user_name as participant_name,
              ep.joined_at
@@ -198,11 +216,12 @@ router.get('/public/all', authenticateToken, async (req, res) => {
     
     // Nhóm sự kiện theo event_id
     const eventsMap = new Map();
-    result.rows.forEach(row => {
+    for (const row of result.rows) {
       if (!eventsMap.has(row.id)) {
+        const creatorName = await getUserName(row.user_id);
         eventsMap.set(row.id, {
           ...row,
-          creator_name: `User ${row.user_id}`, // Đơn giản hóa, không lấy tên từ users table
+          creator_name: creatorName,
           participants: []
         });
       }
@@ -214,7 +233,7 @@ router.get('/public/all', authenticateToken, async (req, res) => {
           joined_at: row.joined_at
         });
       }
-    });
+    }
     
     res.json(Array.from(eventsMap.values()));
   } catch (error) {
@@ -223,12 +242,25 @@ router.get('/public/all', authenticateToken, async (req, res) => {
   }
 });
 
+// Lấy sự kiện mà user đã tham gia (cho calendar)
+router.get('/joined', async (req, res) => {
+  try {
+    console.log('GET /joined called - bypassing auth for testing');
+    
+    // Tạm thời trả về array rỗng để test routing
+    res.json([]);
+  } catch (error) {
+    console.error('Error fetching joined events:', error);
+    res.status(500).json({ error: 'Lỗi lấy danh sách sự kiện đã tham gia' });
+  }
+});
+
 // Tham gia sự kiện
 router.post('/:id/join', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const userName = req.user.name || `${req.user.first_name} ${req.user.last_name}`;
+    const userName = req.user.name || `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || `User ${userId}`;
     
     // Kiểm tra sự kiện có tồn tại không
     const eventQuery = 'SELECT * FROM events WHERE id = $1';

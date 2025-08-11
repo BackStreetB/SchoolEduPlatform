@@ -13,7 +13,16 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: decoded.userId };
+    console.log('Decoded JWT:', decoded);
+    console.log('decoded.userId:', decoded.userId, typeof decoded.userId);
+    req.user = { 
+      id: parseInt(decoded.userId),
+      email: decoded.email,
+      name: decoded.name,
+      first_name: decoded.first_name,
+      last_name: decoded.last_name
+    };
+    console.log('req.user.id:', req.user.id, typeof req.user.id);
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
