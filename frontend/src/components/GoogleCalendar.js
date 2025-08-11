@@ -300,15 +300,16 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
   };
 
   const renderDayView = () => {
-    const dayEvents = getEventsForDate(selectedDate);
-    const isToday = selectedDate.toDateString() === new Date().toDateString();
-    const holiday = getHoliday(selectedDate);
+    // Use currentDate instead of selectedDate for consistency
+    const dayEvents = getEventsForDate(currentDate);
+    const isToday = currentDate.toDateString() === new Date().toDateString();
+    const holiday = getHoliday(currentDate);
 
     return (
       <div className="day-view">
         <div className="day-header">
           <div className="day-info">
-            <h2>{selectedDate.toLocaleDateString('vi-VN', { 
+            <h2>{currentDate.toLocaleDateString('vi-VN', { 
               weekday: 'long', 
               year: 'numeric', 
               month: 'long', 
