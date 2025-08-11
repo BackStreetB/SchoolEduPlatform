@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import './timeline.css';
 import API_ENDPOINTS from './config/api';
+import GoogleCalendar from './components/GoogleCalendar';
 
 // Global helper functions
 const isImage = (fileName) => {
@@ -4198,31 +4199,18 @@ function App() {
           </div>
 
           <div className="dashboard-right">
-            <div className="calendar-section">
-              <div className="calendar-header">
-                <button onClick={goToPreviousMonth} className="calendar-nav-btn">‹</button>
-                <h2>Lịch tháng {monthNames[selectedMonth]} năm {selectedYear}</h2>
-                <button onClick={goToNextMonth} className="calendar-nav-btn">›</button>
-              </div>
-              
-              <div className="calendar-container">
-                <div className="calendar-weekdays">
-                  <div>CN</div>
-                  <div>T2</div>
-                  <div>T3</div>
-                  <div>T4</div>
-                  <div>T5</div>
-                  <div>T6</div>
-                  <div>T7</div>
-                </div>
-                <div className="calendar-grid">
-                  {renderCalendar()}
-                </div>
-              </div>
-              
-              <div className="calendar-actions">
-                <button onClick={goToToday} className="btn-secondary">Hôm nay</button>
-              </div>
+            <div className="google-calendar-section">
+              <GoogleCalendar 
+                events={calendarEvents}
+                onEventClick={(event) => {
+                  console.log('Event clicked:', event);
+                  // Handle event click - có thể mở modal chi tiết
+                }}
+                onTimeSlotClick={(date, time) => {
+                  console.log('Time slot clicked:', date, time);
+                  // Handle time slot click - có thể tạo sự kiện mới
+                }}
+              />
             </div>
           </div>
         </div>

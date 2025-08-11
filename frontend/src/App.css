@@ -3571,7 +3571,17 @@ tr:hover {
   padding: 20px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.1);
   border: 1px solid #e0e0e0;
-  height: fit-content;
+
+}
+
+/* Google Calendar section */
+.google-calendar-section {
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  border: 1px solid #e0e0e0;
+  height: 700px;
+  overflow: hidden;
 }
 
 .calendar-header {
