@@ -2038,7 +2038,7 @@ tr:hover {
 .diary-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   margin-top: 20px;
 }
 
@@ -2054,6 +2054,35 @@ tr:hover {
 .diary-card:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   transform: translateY(-2px);
+}
+
+.diary-card.compact {
+  padding: 15px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.diary-card.compact:hover {
+  background: #f8f9fa;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.diary-card.compact .diary-header {
+  margin-bottom: 0;
+  align-items: center;
+}
+
+.diary-card.compact .diary-title {
+  font-size: 16px;
+  margin-bottom: 4px;
+  color: #333;
+  font-weight: 600;
+}
+
+.diary-card.compact .diary-time {
+  font-size: 12px;
+  color: #666;
 }
 
 .diary-header {

@@ -1121,7 +1121,7 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
           </div>
         ) : (
           diaries.map(diary => (
-            <div key={diary.id} className="diary-card">
+            <div key={diary.id} className="diary-card compact" onClick={() => openViewForm(diary)}>
               <div className="diary-header">
                 <div className="diary-info">
                   <h3 className="diary-title">{diary.title}</h3>
@@ -1144,25 +1144,24 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
                   </div>
                 </div>
                 <div className="diary-actions">
-                  <button 
-                    className="btn-view" 
-                    onClick={() => openViewForm(diary)}
-                    title="Xem nhật ký"
-                  >
-                    👁️
-                  </button>
                   {canEditDiary(diary) ? (
                     <>
                       <button 
                         className="btn-edit" 
-                        onClick={() => openEditForm(diary)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditForm(diary);
+                        }}
                         title="Chỉnh sửa"
                       >
                         ✏️
                       </button>
                       <button 
                         className="btn-delete" 
-                        onClick={() => handleDeleteDiary(diary.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDiary(diary.id);
+                        }}
                         title="Xóa"
                       >
                         🗑️
@@ -1178,9 +1177,6 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
                     </button>
                   )}
                 </div>
-              </div>
-              <div className="diary-content">
-                <p>{diary.content}</p>
               </div>
             </div>
           ))
