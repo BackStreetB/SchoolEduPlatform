@@ -25,7 +25,7 @@ export const API_ENDPOINTS = {
   COMMUNITY_REACTIONS: (id) => `${API_BASE}/community/${id}/reactions`,
   COMMUNITY_COMMENTS: (id) => `${API_BASE}/community/${id}/comments`,
   COMMUNITY_COMMENT_BY_ID: (id) => `${API_BASE}/community/comments/${id}`,
-  COMMUNITY_UPLOADS: `${API_BASE}/community/uploads`,
+  COMMUNITY_UPLOADS: `/uploads`,
   
   // Teacher Service
   PROFILE: `${API_BASE}/profile`,
@@ -34,6 +34,12 @@ export const API_ENDPOINTS = {
   
   // Report Service
   REPORTS: `${API_BASE}/reports`,
+  
+  // Online Class Service
+  ONLINE_CLASS: `${API_BASE}/online-class`,
+  ONLINE_CLASS_BY_ID: (id) => `${API_BASE}/online-class/${id}`,
+  ONLINE_CLASS_JOIN: (id) => `${API_BASE}/online-class/${id}/join`,
+  ONLINE_CLASS_STUDENTS: (id) => `${API_BASE}/online-class/${id}/students`,
 };
 
 export default API_ENDPOINTS; 

@@ -282,6 +282,7 @@ router.get('/joined-debug', authenticateToken, async (req, res) => {
 // Lấy sự kiện mà user đã tham gia (cho calendar)
 router.get('/joined', authenticateToken, async (req, res) => {
   console.log('=== JOINED API START ===');
+  console.log('req.user:', req.user);
   try {
     const userId = req.user.id;
     console.log('Joined API - userId:', userId, 'type:', typeof userId);
@@ -291,6 +292,11 @@ router.get('/joined', authenticateToken, async (req, res) => {
       console.error('Missing userId:', userId);
       return res.status(400).json({ error: 'Missing user ID' });
     }
+    
+    // Debug: Kiểm tra event_participants trước
+    const debugQuery = 'SELECT * FROM event_participants WHERE user_id = $1';
+    const debugResult = await pool.query(debugQuery, [parseInt(userId)]);
+    console.log('Debug - All participants for user:', debugResult.rows);
     
     const query = `
       SELECT DISTINCT e.*, ep.joined_at
@@ -302,6 +308,7 @@ router.get('/joined', authenticateToken, async (req, res) => {
     
     const result = await pool.query(query, [parseInt(userId)]);
     console.log('Joined events found:', result.rows.length);
+    console.log('Joined events data:', result.rows);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching joined events:', error);

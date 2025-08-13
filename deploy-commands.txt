@@ -1,0 +1,43 @@
+DEPLOYMENT COMMANDS FOR VPS: 222.255.214.154
+================================================
+
+STEP 1: Upload backup to VPS
+----------------------------
+scp VPS_BACKUP_20250812_010159.zip root@222.255.214.154:/root/
+scp vps-setup-ubuntu.sh root@222.255.214.154:/root/
+scp vps-deploy.sh root@222.255.214.154:/root/
+
+STEP 2: Connect to VPS and setup
+--------------------------------
+ssh root@222.255.214.154
+
+# Once connected, run:
+chmod +x vps-setup-ubuntu.sh
+./vps-setup-ubuntu.sh
+
+# Wait for completion, then reboot:
+sudo reboot
+
+STEP 3: Deploy system (after reboot)
+------------------------------------
+ssh root@222.255.214.154
+
+# Run deployment:
+chmod +x vps-deploy.sh
+./vps-deploy.sh
+
+STEP 4: Access your system
+--------------------------
+URL: http://222.255.214.154
+All your data will be preserved!
+
+TROUBLESHOOTING COMMANDS
+------------------------
+# Check services:
+docker-compose -f docker-compose.prod.yml ps
+
+# Check logs:
+docker-compose -f docker-compose.prod.yml logs frontend
+
+# Restart if needed:
+docker-compose -f docker-compose.prod.yml restart

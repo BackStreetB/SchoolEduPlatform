@@ -251,6 +251,35 @@ services:
     networks:
       - school_network
 
+  # Online Class Service
+  online-class-service:
+    build:
+      context: ./online-class-service
+      dockerfile: Dockerfile
+    container_name: school_online_class_service
+    environment:
+      - NODE_ENV=development
+      - PORT=3007
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=school_online_class
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - FRONTEND_URL=http://localhost:3000
+      - ZOOM_SDK_KEY=your_zoom_sdk_key
+      - ZOOM_SDK_SECRET=your_zoom_sdk_secret
+    ports:
+      - "3007:3007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - school_network
+    volumes:
+      - ./online-class-service:/app
+      - /app/node_modules
+
 volumes:
   postgres_data:
   community_uploads:

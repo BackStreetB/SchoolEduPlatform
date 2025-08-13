@@ -1052,10 +1052,6 @@ router.delete('/comments/:commentId', authenticateToken, async (req, res) => {
   }
 });
 
-// Serve uploaded files
-router.get('/uploads/:filename', (req, res) => {
-  const { filename } = req.params;
-  res.sendFile(path.join(__dirname, '../../uploads', filename));
-});
+// Serve uploaded files - moved to index.js for public access
 
 module.exports = router; 

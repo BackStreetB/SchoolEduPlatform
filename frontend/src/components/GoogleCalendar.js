@@ -328,7 +328,9 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
 
                   {/* Events */}
                   {dayEvents.map((event, eventIdx) => {
-                    const position = getEventPosition(event);
+                    const position = getEventPosition(event, date);
+                    if (!position) return null; // Skip if event doesn't occur on this date
+                    
                     return (
                       <div
                         key={eventIdx}
@@ -342,7 +344,13 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
                       >
                         <div className="event-title">{event.title}</div>
                         <div className="event-time">
-                          {event.start_time?.substring(0, 5)} - {event.end_time?.substring(0, 5)}
+                          {position.isMultiDay ? (
+                            position.isFirstDay ? `Từ ${event.start_time?.substring(0, 5)}` :
+                            position.isLastDay ? `Đến ${event.end_time?.substring(0, 5)}` :
+                            'Cả ngày'
+                          ) : (
+                            `${event.start_time?.substring(0, 5)} - ${event.end_time?.substring(0, 5)}`
+                          )}
                         </div>
                       </div>
                     );

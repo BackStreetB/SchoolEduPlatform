@@ -3,6 +3,7 @@ import './App.css';
 import './timeline.css';
 import API_ENDPOINTS from './config/api';
 import GoogleCalendar from './components/GoogleCalendar';
+import OnlineClassComponent from './components/OnlineClassComponent';
 
 // Global helper functions
 const isImage = (fileName) => {
@@ -50,7 +51,7 @@ const formatTime = (timeString) => {
 };
 
 // Events Component
-const EventsComponent = ({ onEventCreated, showNotification }) => {
+const EventsComponent = ({ onEventCreated, showNotification, fetchCalendarData }) => {
   const [events, setEvents] = useState([]);
   const [publicEvents, setPublicEvents] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -125,15 +126,35 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
     e.preventDefault();
     setLoading(true);
     
-    // Validation
+    // Validation cơ bản
     if (!formData.title || !formData.start_date || !formData.end_date) {
       showNotification('Vui lòng điền đầy đủ thông tin bắt buộc', 'error');
       setLoading(false);
       return;
     }
     
+    // Validation thời gian
+    if (formData.start_time && !formData.start_time.match(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)) {
+      showNotification('Giờ bắt đầu không hợp lệ. Vui lòng nhập theo định dạng HH:MM', 'error');
+      setLoading(false);
+      return;
+    }
+    
+    if (formData.end_time && !formData.end_time.match(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)) {
+      showNotification('Giờ kết thúc không hợp lệ. Vui lòng nhập theo định dạng HH:MM', 'error');
+      setLoading(false);
+      return;
+    }
+    
+    // Format thời gian - đảm bảo format HH:MM
+    const formattedData = {
+      ...formData,
+      start_time: formData.start_time || '',
+      end_time: formData.end_time || ''
+    };
+    
     // Debug: Log form data
-    console.log('Creating event with data:', formData);
+    console.log('Creating event with data:', formattedData);
     
     try {
       const response = await fetch(API_ENDPOINTS.EVENTS, {
@@ -142,7 +163,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formattedData)
       });
       
       if (response.ok) {
@@ -159,13 +180,28 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
         });
         fetchPublicEvents();
         showNotification('Tạo sự kiện thành công!', 'success');
+        
+        // Tự động join event mới tạo để hiển thị trên calendar
+        try {
+          const joinResponse = await fetch(`${API_ENDPOINTS.EVENTS}/${newEvent.id}/join`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+            }
+          });
+          
+          if (joinResponse.ok) {
+            showNotification('Đã tự động tham gia sự kiện mới!', 'success');
+            // Refresh calendar data immediately
+            fetchCalendarData();
+          }
+        } catch (error) {
+          console.error('Error auto-joining event:', error);
+        }
+        
         // Update calendar in real-time
         if (onEventCreated) {
           onEventCreated(newEvent);
-        }
-        // Refresh calendar data immediately
-        if (window.fetchCalendarData) {
-          window.fetchCalendarData();
         }
       } else {
         const error = await response.json();
@@ -193,6 +229,8 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
       
       if (response.ok) {
         fetchEvents();
+        // Refresh calendar data immediately
+        fetchCalendarData();
       } else {
         const error = await response.json();
         showNotification(error.error || 'Lỗi xóa sự kiện', 'error');
@@ -223,9 +261,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
         }
         
         // Refresh calendar data immediately
-        if (window.fetchCalendarData) {
-          window.fetchCalendarData();
-        }
+        fetchCalendarData();
       } else {
         const error = await response.json();
         showNotification(error.error || 'Lỗi tham gia sự kiện', 'error');
@@ -255,9 +291,7 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
         }
         
         // Refresh calendar data immediately
-        if (window.fetchCalendarData) {
-          window.fetchCalendarData();
-        }
+        fetchCalendarData();
       } else {
         const error = await response.json();
         showNotification(error.error || 'Lỗi rời khỏi sự kiện', 'error');
@@ -322,6 +356,20 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
   const handleEditEvent = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
+    // Validation thời gian
+    if (formData.start_time && !formData.start_time.match(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)) {
+      showNotification('Giờ bắt đầu không hợp lệ. Vui lòng nhập theo định dạng HH:MM', 'error');
+      setLoading(false);
+      return;
+    }
+    
+    if (formData.end_time && !formData.end_time.match(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)) {
+      showNotification('Giờ kết thúc không hợp lệ. Vui lòng nhập theo định dạng HH:MM', 'error');
+      setLoading(false);
+      return;
+    }
+    
     try {
       const response = await fetch(`${API_ENDPOINTS.EVENTS}/${editingEvent.id}`, {
         method: 'PUT',
@@ -345,6 +393,8 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
           color: 'blue'
         });
         fetchPublicEvents();
+        // Refresh calendar data immediately
+        fetchCalendarData();
         if (onEventCreated) {
           onEventCreated();
         }
@@ -403,7 +453,13 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
                 <input
                   type="date"
                   value={formData.start_date || ''}
-                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                  onChange={(e) => {
+                    setFormData({...formData, start_date: e.target.value});
+                    // Khi chọn ngày, tự động hiện time picker
+                    if (e.target.value && !formData.start_time) {
+                      setFormData(prev => ({...prev, start_time: '09:00'}));
+                    }
+                  }}
                   required
                 />
               </div>
@@ -413,33 +469,47 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
                 <input
                   type="date"
                   value={formData.end_date || ''}
-                  onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+                  onChange={(e) => {
+                    setFormData({...formData, end_date: e.target.value});
+                    // Khi chọn ngày, tự động hiện time picker
+                    if (e.target.value && !formData.end_time) {
+                      setFormData(prev => ({...prev, end_time: '18:00'}));
+                    }
+                  }}
                   required
                 />
               </div>
             </div>
             
-            <div className="form-row">
-              <div className="form-group">
-                <label>Giờ bắt đầu:</label>
-                <input
-                  type="time"
-                  value={formData.start_time || ''}
-                  onChange={(e) => setFormData({...formData, start_time: e.target.value})}
-                  step="60"
-                />
+            {formData.start_date && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Giờ bắt đầu:</label>
+                  <input
+                    type="time"
+                    value={formData.start_time || ''}
+                    onChange={(e) => setFormData({...formData, start_time: e.target.value})}
+                    step="900"
+                    min="00:00"
+                    max="23:59"
+                    required
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Giờ kết thúc:</label>
+                  <input
+                    type="time"
+                    value={formData.end_time || ''}
+                    onChange={(e) => setFormData({...formData, end_time: e.target.value})}
+                    step="900"
+                    min="00:00"
+                    max="23:59"
+                    required
+                  />
+                </div>
               </div>
-              
-              <div className="form-group">
-                <label>Giờ kết thúc:</label>
-                <input
-                  type="time"
-                  value={formData.end_time || ''}
-                  onChange={(e) => setFormData({...formData, end_time: e.target.value})}
-                  step="60"
-                />
-              </div>
-            </div>
+            )}
             
             <div className="form-row">
               <div className="form-group">
@@ -542,9 +612,12 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
                 <label>Giờ bắt đầu:</label>
                 <input
                   type="time"
-                  value={formData.start_time}
+                  value={formData.start_time || ''}
                   onChange={(e) => setFormData({...formData, start_time: e.target.value})}
-                  step="60"
+                  step="900"
+                  min="00:00"
+                  max="23:59"
+                  required
                 />
               </div>
               
@@ -552,9 +625,12 @@ const EventsComponent = ({ onEventCreated, showNotification }) => {
                 <label>Giờ kết thúc:</label>
                 <input
                   type="time"
-                  value={formData.end_time}
+                  value={formData.end_time || ''}
                   onChange={(e) => setFormData({...formData, end_time: e.target.value})}
-                  step="60"
+                  step="900"
+                  min="00:00"
+                  max="23:59"
+                  required
                 />
               </div>
             </div>
@@ -3493,13 +3569,7 @@ function App() {
     addPost: (postData) => updateCalendarData('post', postData)
   };
 
-  // Expose fetchCalendarData to window for child components
-  useEffect(() => {
-    window.fetchCalendarData = fetchCalendarData;
-    return () => {
-      delete window.fetchCalendarData;
-    };
-  }, []);
+  // Expose fetchCalendarData to window for child components (no longer needed)
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -4211,7 +4281,7 @@ function App() {
                   // Handle time slot click - có thể tạo sự kiện mới
                 }}
               />
-            </div>
+              </div>
           </div>
         </div>
       </div>
@@ -4286,6 +4356,12 @@ function App() {
           >
             Nhật ký
           </button>
+          <button 
+            className={`nav-tab ${activeTab === 'online-class' ? 'active' : ''}`}
+            onClick={() => setActiveTab('online-class')}
+          >
+            🎓 Lớp học trực tuyến
+          </button>
         </nav>
         
         <div className="nav-user">
@@ -4308,7 +4384,7 @@ function App() {
 
       <main className="app-main">
         {activeTab === 'dashboard' && renderDashboard()}
-        {activeTab === 'events' && <EventsComponent onEventCreated={calendarUpdateFunctions.addEvent} showNotification={showNotification} />}
+        {activeTab === 'events' && <EventsComponent onEventCreated={calendarUpdateFunctions.addEvent} showNotification={showNotification} fetchCalendarData={fetchCalendarData} />}
                            {activeTab === 'community' && <CommunityComponent 
             onPostCreated={calendarUpdateFunctions.addPost} 
             onUserClick={(userId) => {
@@ -4325,6 +4401,7 @@ function App() {
             showNotification={showNotification}
           />}
         {activeTab === 'diary' && <DiaryComponent onDiaryCreated={calendarUpdateFunctions.addDiary} showNotification={showNotification} />}
+        {activeTab === 'online-class' && <OnlineClassComponent showNotification={showNotification} />}
       </main>
 
       {/* Day Click Modal */}
@@ -4389,7 +4466,7 @@ function App() {
                           </div>
                         )}
                       </div>
-                    </div>
+                  </div>
                   );
                 })}
 
@@ -4416,8 +4493,8 @@ function App() {
                       borderRadius: '50%',
                       backgroundColor: '#ff4757'
                     }}></div>
-                  </div>
-                )}
+                </div>
+              )}
               </div>
 
               {/* Tạo sự kiện mới cho ngày này (nếu không phải ngày quá khứ) */}
@@ -4461,7 +4538,7 @@ function App() {
                   </button>
                 </div>
               )}
-
+              
               {/* Thông báo ngày quá khứ không có sự kiện */}
               {selectedDayEvents.length === 0 && isDateInPast(selectedDate) && (
                 <div className="no-events-timeline" style={{
@@ -4473,8 +4550,8 @@ function App() {
                   color: '#666'
                 }}>
                   <div style={{ fontSize: '48px', marginBottom: '10px' }}>👁️</div>
-                  <h4>Chỉ xem được</h4>
-                  <p>Ngày này đã qua và không có sự kiện nào</p>
+                    <h4>Chỉ xem được</h4>
+                    <p>Ngày này đã qua và không có sự kiện nào</p>
                 </div>
               )}
             </div>

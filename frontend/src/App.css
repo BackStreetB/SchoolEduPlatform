@@ -4680,3 +4680,93 @@ input[type="time"]::-moz-calendar-picker-indicator {
     font-size: 11px;
   }
 }
+
+/* =============================================================================
+   TIME INPUT STYLING - ĐẢM BẢO FORMAT HH:MM
+   ============================================================================= */
+
+/* Time input styling - đảm bảo format HH:MM */
+input[type="time"] {
+  font-family: monospace;
+  text-align: center;
+  letter-spacing: 1px;
+  min-width: 120px;
+}
+
+/* Datetime-local input styling */
+input[type="datetime-local"] {
+  font-family: monospace;
+  text-align: center;
+  letter-spacing: 1px;
+  min-width: 200px;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+  background: white;
+}
+
+input[type="datetime-local"]:focus {
+  outline: none;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Chrome/Safari/Edge */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+input[type="time"]::-webkit-datetime-edit-ampm-field {
+  display: none;
+}
+
+input[type="time"]::-webkit-datetime-edit-hour-field {
+  display: block;
+  min-width: 2em;
+  text-align: center;
+}
+
+input[type="time"]::-webkit-datetime-edit-minute-field {
+  display: block;
+  min-width: 2em;
+  text-align: center;
+}
+
+input[type="time"]::-webkit-datetime-edit-separator {
+  display: block;
+  min-width: 0.5em;
+  text-align: center;
+}
+
+/* Firefox */
+input[type="time"]::-moz-calendar-picker-indicator {
+  display: none;
+}
+
+input[type="time"]::-moz-datetime-edit-hour-field,
+input[type="time"]::-moz-datetime-edit-minute-field {
+  display: inline-block;
+  min-width: 2em;
+  text-align: center;
+}
+
+/* Đảm bảo time input không bị xuống dòng */
+input[type="time"]::-moz-datetime-edit-separator {
+  display: inline-block;
+  min-width: 0.5em;
+  text-align: center;
+}
+
+/* Focus state cho time input */
+input[type="time"]:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Placeholder cho time input */
+input[type="time"]::placeholder {
+  color: #9CA3AF;
+  font-style: italic;
+}

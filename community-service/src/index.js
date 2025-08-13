@@ -82,6 +82,29 @@ app.get('/test-media/:filename', (req, res) => {
 // Routes
 app.use('/api/community', authenticateToken, communityRoutes);
 
+// Public uploads route (không cần auth)
+app.use('/uploads', express.static(path.join(__dirname, '..', uploadPath), {
+  setHeaders: (res, path) => {
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+    
+    // MIME types
+    if (path.endsWith('.mp4')) {
+      res.setHeader('Content-Type', 'video/mp4');
+    } else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    } else if (path.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    }
+    
+    // Cache headers
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+  }
+}));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
