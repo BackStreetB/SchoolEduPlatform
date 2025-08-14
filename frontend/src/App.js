@@ -4,6 +4,7 @@ import './timeline.css';
 import API_ENDPOINTS from './config/api';
 import GoogleCalendar from './components/GoogleCalendar';
 import OnlineClassComponent from './components/OnlineClassComponent';
+import MediaUpload from './components/MediaUpload';
 
 // Global helper functions
 const isImage = (fileName) => {
@@ -48,6 +49,15 @@ const formatTime = (timeString) => {
     return timeString.substring(0, 5); // Lấy HH:MM
   }
   return timeString;
+};
+
+// Helper function to format file size
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
 // Events Component
@@ -193,7 +203,7 @@ const EventsComponent = ({ onEventCreated, showNotification, fetchCalendarData }
           if (joinResponse.ok) {
             showNotification('Đã tự động tham gia sự kiện mới!', 'success');
             // Refresh calendar data immediately
-            fetchCalendarData();
+            // fetchCalendarData(); // Commented out to prevent duplicate calls
           }
         } catch (error) {
           console.error('Error auto-joining event:', error);
@@ -230,7 +240,7 @@ const EventsComponent = ({ onEventCreated, showNotification, fetchCalendarData }
       if (response.ok) {
         fetchEvents();
         // Refresh calendar data immediately
-        fetchCalendarData();
+        // fetchCalendarData(); // Commented out to prevent duplicate calls
       } else {
         const error = await response.json();
         showNotification(error.error || 'Lỗi xóa sự kiện', 'error');
@@ -261,7 +271,7 @@ const EventsComponent = ({ onEventCreated, showNotification, fetchCalendarData }
         }
         
         // Refresh calendar data immediately
-        fetchCalendarData();
+        // fetchCalendarData(); // Commented out to prevent duplicate calls
       } else {
         const error = await response.json();
         showNotification(error.error || 'Lỗi tham gia sự kiện', 'error');
@@ -291,7 +301,7 @@ const EventsComponent = ({ onEventCreated, showNotification, fetchCalendarData }
         }
         
         // Refresh calendar data immediately
-        fetchCalendarData();
+        // fetchCalendarData(); // Commented out to prevent duplicate calls
       } else {
         const error = await response.json();
         showNotification(error.error || 'Lỗi rời khỏi sự kiện', 'error');
@@ -394,7 +404,7 @@ const EventsComponent = ({ onEventCreated, showNotification, fetchCalendarData }
         });
         fetchPublicEvents();
         // Refresh calendar data immediately
-        fetchCalendarData();
+        // fetchCalendarData(); // Commented out to prevent duplicate calls
         if (onEventCreated) {
           onEventCreated();
         }
@@ -543,6 +553,17 @@ const EventsComponent = ({ onEventCreated, showNotification, fetchCalendarData }
               </div>
             </div>
             
+            {/* Media Upload */}
+            <div className="form-group">
+              <label>Thêm ảnh/video:</label>
+              <MediaUpload 
+                onMediaChange={(mediaFiles) => {
+                  setFormData({...formData, media_files: mediaFiles});
+                }}
+                maxFiles={5}
+              />
+            </div>
+            
             <div className="form-actions">
               <button type="submit" className="btn-primary" disabled={loading}>
                 {loading ? 'Đang tạo...' : 'Tạo sự kiện'}
@@ -665,6 +686,18 @@ const EventsComponent = ({ onEventCreated, showNotification, fetchCalendarData }
                   ></div>
                 </div>
               </div>
+            </div>
+            
+            {/* Media Upload */}
+            <div className="form-group">
+              <label>Thêm ảnh/video:</label>
+              <MediaUpload 
+                onMediaChange={(mediaFiles) => {
+                  setFormData({...formData, media_files: mediaFiles});
+                }}
+                maxFiles={5}
+                existingMedia={editingEvent?.media_files || []}
+              />
             </div>
             
             <div className="form-actions">
@@ -896,7 +929,8 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
   const [viewingDiary, setViewingDiary] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
-    content: ''
+    content: '',
+    media_files: []
   });
   const [loading, setLoading] = useState(false);
 
@@ -923,14 +957,26 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
   const handleCreateDiary = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
+    console.log('📝 handleCreateDiary: formData before API call:', formData);
+    console.log('📝 handleCreateDiary: media_files:', formData.media_files);
+    
     try {
+      const requestBody = {
+        title: formData.title,
+        content: formData.content,
+        media_files: formData.media_files || []
+      };
+      
+      console.log('📝 handleCreateDiary: Request body:', requestBody);
+      
       const response = await fetch(API_ENDPOINTS.DIARY, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(requestBody)
       });
       
       if (response.ok) {
@@ -938,7 +984,8 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
         setShowCreateForm(false);
         setFormData({
           title: '',
-          content: ''
+          content: '',
+          media_files: []
         });
         fetchDiaries();
         if (onDiaryCreated) {
@@ -966,7 +1013,11 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          title: formData.title,
+          content: formData.content,
+          media_files: formData.media_files || []
+        })
       });
       
       if (response.ok) {
@@ -975,7 +1026,8 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
         setEditingDiary(null);
         setFormData({
           title: '',
-          content: ''
+          content: '',
+          media_files: []
         });
         fetchDiaries();
       } else {
@@ -1017,7 +1069,8 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
     setEditingDiary(diary);
     setFormData({
       title: diary.title,
-      content: diary.content
+      content: diary.content,
+      media_files: diary.media_files || []
     });
     setShowEditForm(true);
   };
@@ -1088,7 +1141,19 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
                 />
               </div>
               
-
+              {/* Media Upload */}
+              <div className="form-group">
+                <label>Thêm ảnh/video:</label>
+                <MediaUpload 
+                  onMediaChange={(mediaFiles) => {
+                    console.log('📝 App.js: onMediaChange called with:', mediaFiles);
+                    console.log('📝 App.js: Current formData:', formData);
+                    setFormData({...formData, media_files: mediaFiles});
+                    console.log('📝 App.js: formData updated with media_files');
+                  }}
+                  maxFiles={5}
+                />
+              </div>
               
               <div className="form-actions">
                 <button type="button" onClick={() => setShowCreateForm(false)} className="btn-secondary">
@@ -1132,7 +1197,17 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
                 />
               </div>
               
-
+              {/* Media Upload */}
+              <div className="form-group">
+                <label>Thêm ảnh/video:</label>
+                <MediaUpload 
+                  onMediaChange={(mediaFiles) => {
+                    setFormData({...formData, media_files: mediaFiles});
+                  }}
+                  maxFiles={5}
+                  existingMedia={viewingDiary?.media_files || []}
+                />
+              </div>
               
               <div className="form-actions">
                 <button type="button" onClick={() => setShowEditForm(false)} className="btn-secondary">
@@ -1170,6 +1245,36 @@ const DiaryComponent = ({ onDiaryCreated, showNotification }) => {
                 </div>
                 <div className="diary-view-content">
                   <p>{viewingDiary.content}</p>
+                  
+                  {/* Media Display */}
+                  {viewingDiary.media_files && viewingDiary.media_files.length > 0 && (
+                    <div className="diary-media">
+                      <h4>Ảnh/Video:</h4>
+                      <div className="media-grid">
+                        {viewingDiary.media_files.map((media, index) => (
+                          <div key={index} className="media-item">
+                            {media.type?.startsWith('image/') ? (
+                              <img 
+                                src={media.url} 
+                                alt={`Media ${index + 1}`}
+                                className="media-image"
+                              />
+                            ) : (
+                              <video 
+                                src={media.url} 
+                                controls
+                                className="media-video"
+                              />
+                            )}
+                            <div className="media-info">
+                              <span className="media-name">{media.name}</span>
+                              <span className="media-size">{formatFileSize(media.size)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -3422,6 +3527,36 @@ function App() {
     }
   };
 
+  // Handle create diary from calendar
+  const handleCreateDiaryFromCalendar = (timeSlotData) => {
+    console.log('Creating diary from calendar:', timeSlotData);
+    // Chuyển sang tab nhật ký và mở form tạo mới
+    setActiveTab('diary');
+    // Có thể thêm logic để tự động điền thời gian
+    setTimeout(() => {
+      // Trigger tạo nhật ký mới
+      const diarySection = document.querySelector('.diary-section .btn-primary');
+      if (diarySection) {
+        diarySection.click();
+      }
+    }, 100);
+  };
+
+  // Handle create event from calendar
+  const handleCreateEventFromCalendar = (timeSlotData) => {
+    console.log('Creating event from calendar:', timeSlotData);
+    // Chuyển sang tab sự kiện và mở form tạo mới
+    setActiveTab('events');
+    // Có thể thêm logic để tự động điền thời gian
+    setTimeout(() => {
+      // Trigger tạo sự kiện mới
+      const eventSection = document.querySelector('.events-container .btn-primary');
+      if (eventSection) {
+        eventSection.click();
+      }
+    }, 100);
+  };
+
   // Function to get daily motivation quote
   const fetchDailyQuote = async () => {
     try {
@@ -4272,14 +4407,21 @@ function App() {
             <div className="google-calendar-section">
               <GoogleCalendar 
                 events={calendarEvents}
+                diaries={calendarDiaries}
                 onEventClick={(event) => {
                   console.log('Event clicked:', event);
                   // Handle event click - có thể mở modal chi tiết
+                }}
+                onDiaryClick={(diary) => {
+                  console.log('Diary clicked:', diary);
+                  // Handle diary click - có thể mở modal chi tiết
                 }}
                 onTimeSlotClick={(date, time) => {
                   console.log('Time slot clicked:', date, time);
                   // Handle time slot click - có thể tạo sự kiện mới
                 }}
+                onCreateDiary={handleCreateDiaryFromCalendar}
+                onCreateEvent={handleCreateEventFromCalendar}
               />
               </div>
           </div>

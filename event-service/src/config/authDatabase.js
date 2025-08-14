@@ -2,11 +2,11 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 const authPool = new Pool({
-  user: process.env.POSTGRES_USER,
-  host: process.env.POSTGRES_HOST,
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'postgres',
   database: 'school_auth', // Connect to auth database
-  password: process.env.POSTGRES_PASSWORD,
-  port: process.env.POSTGRES_PORT,
+  password: process.env.DB_PASSWORD || 'password',
+  port: process.env.DB_PORT || 5432,
 });
 
 // Test connection

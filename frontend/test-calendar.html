@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Calendar Features</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .test-button:hover {
+            background: #1557b0;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .time-slot {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+            background: #f9f9f9;
+        }
+        .time-slot:hover {
+            background: #e3f2fd;
+            border-color: #1a73e8;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+        }
+        .close {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test Calendar Features</h1>
+        
+        <div class="debug-info">
+            <h3>Debug Info:</h3>
+            <p>✅ MediaUpload component đã được tạo</p>
+            <p>✅ GoogleCalendar đã được cập nhật</p>
+            <p>✅ CSS đã được cập nhật với !important</p>
+            <p>✅ Debug console.log đã được thêm</p>
+        </div>
+
+        <h2>Test 1: Click vào khung giờ</h2>
+        <p>Click vào các khung giờ dưới đây để test tính năng tạo nhật ký/sự kiện:</p>
+        
+        <div class="time-slot" onclick="testTimeSlotClick(9)">
+            🕘 9:00 AM - Click để tạo nhật ký/sự kiện
+        </div>
+        
+        <div class="time-slot" onclick="testTimeSlotClick(14)">
+            🕑 2:00 PM - Click để tạo nhật ký/sự kiện
+        </div>
+        
+        <div class="time-slot" onclick="testTimeSlotClick(19)">
+            🕖 7:00 PM - Click để tạo nhật ký/sự kiện
+        </div>
+
+        <h2>Test 2: Modal tạo mới</h2>
+        <button class="test-button" onclick="showTestModal()">
+            Hiển thị Modal Test
+        </button>
+
+        <h2>Test 3: MediaUpload Component</h2>
+        <p>Component này sẽ hiển thị trong form tạo nhật ký/sự kiện</p>
+        
+        <div id="media-upload-test">
+            <h4>Media Upload Test Area</h4>
+            <p>Kéo thả file vào đây hoặc click để chọn</p>
+            <input type="file" multiple accept="image/*,video/*" onchange="handleFileSelect(event)">
+        </div>
+
+        <h2>Hướng dẫn test:</h2>
+        <ol>
+            <li>Mở Console (F12) để xem debug logs</li>
+            <li>Click vào các khung giờ để test tính năng mới</li>
+            <li>Kiểm tra xem modal có hiển thị không</li>
+            <li>Test upload file trong MediaUpload component</li>
+        </ol>
+    </div>
+
+    <!-- Test Modal -->
+    <div id="testModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTestModal()">&times;</span>
+            <h2>🎯 Test Modal</h2>
+            <p>Modal này đang hoạt động! Điều này có nghĩa là CSS đã được load đúng.</p>
+            <div class="time-info">
+                <p>Thời gian: 14 tháng 8, 2025 lúc 2:00 PM</p>
+            </div>
+            <div class="create-options">
+                <button class="create-option active">📝 Tạo nhật ký</button>
+                <button class="create-option">📅 Tạo sự kiện</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeTestModal()">Hủy</button>
+                <button class="btn-create">Tạo nhật ký</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function testTimeSlotClick(hour) {
+            console.log('🎯 Time slot clicked:', hour);
+            alert(`Khung giờ ${hour}:00 đã được click! Tính năng này sẽ hoạt động trong calendar thật.`);
+        }
+
+        function showTestModal() {
+            document.getElementById('testModal').style.display = 'block';
+            console.log('✅ Test modal displayed');
+        }
+
+        function closeTestModal() {
+            document.getElementById('testModal').style.display = 'none';
+            console.log('❌ Test modal closed');
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            console.log('📁 Files selected:', files.length);
+            
+            for (let file of files) {
+                console.log('File:', file.name, 'Size:', file.size, 'Type:', file.type);
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('testModal');
+            if (event.target === modal) {
+                closeTestModal();
+            }
+        }
+
+        console.log('🚀 Test page loaded successfully!');
+        console.log('🔍 Check console for debug information');
+    </script>
+</body>
+</html>

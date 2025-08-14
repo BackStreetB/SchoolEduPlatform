@@ -1,0 +1,44 @@
+/* Test Calendar CSS */
+.test-calendar {
+  border: 2px solid red;
+  padding: 20px;
+  margin: 20px;
+  background: #f0f0f0;
+}
+
+.test-time-slot {
+  border: 1px solid blue;
+  padding: 10px;
+  margin: 5px;
+  cursor: pointer;
+  background: #e3f2fd;
+}
+
+.test-time-slot:hover {
+  background: #bbdefb;
+  border-color: #1976d2;
+}
+
+.test-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border: 2px solid green;
+  padding: 20px;
+  border-radius: 8px;
+  z-index: 9999;
+}
+
+.test-debug {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  z-index: 10000;
+}

@@ -1,10 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import './GoogleCalendar.css';
 
-const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
+const GoogleCalendar = ({ events = [], diaries = [], onEventClick, onDiaryClick, onTimeSlotClick, onCreateDiary, onCreateEvent }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // year, month, week, day
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
+  const [createType, setCreateType] = useState('diary'); // 'diary' or 'event'
+
+  // Debug: Log props
+  useEffect(() => {
+    console.log('🔍 GoogleCalendar props:', {
+      events: events.length,
+      diaries: diaries.length,
+      onCreateDiary: !!onCreateDiary,
+      onCreateEvent: !!onCreateEvent,
+      view: view
+    });
+  }, [events, diaries, onCreateDiary, onCreateEvent, view]);
+
+  // Debug: Log current state
+  useEffect(() => {
+    console.log('📊 GoogleCalendar state:', {
+      currentDate: currentDate.toISOString(),
+      view: view,
+      showCreateModal: showCreateModal,
+      selectedTimeSlot: selectedTimeSlot
+    });
+  }, [currentDate, view, showCreateModal, selectedTimeSlot]);
 
   // Vietnamese holidays 2025
   const vietnamHolidays = {
@@ -19,6 +43,56 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
     '2025-04-30': 'Ngày Giải phóng miền Nam',
     '2025-05-01': 'Ngày Quốc tế Lao động',
     '2025-09-02': 'Ngày Quốc khánh'
+  };
+
+  // Handle time slot click
+  const handleTimeSlotClick = (hour, date = null) => {
+    console.log('🎯 Time slot clicked:', { hour, date, currentDate });
+    const targetDate = date || currentDate;
+    const clickedTime = new Date(targetDate);
+    clickedTime.setHours(hour, 0, 0, 0);
+    
+    setSelectedTimeSlot({
+      date: targetDate,
+      hour: hour,
+      time: clickedTime
+    });
+    setCreateType('diary'); // Default to diary
+    setShowCreateModal(true);
+    console.log('✅ Modal should be visible now');
+  };
+
+  // Handle create diary
+  const handleCreateDiary = () => {
+    console.log('📝 Creating diary from calendar');
+    if (onCreateDiary && selectedTimeSlot) {
+      onCreateDiary({
+        date: selectedTimeSlot.date,
+        time: selectedTimeSlot.time,
+        hour: selectedTimeSlot.hour
+      });
+    }
+    setShowCreateModal(false);
+  };
+
+  // Handle create event
+  const handleCreateEvent = () => {
+    console.log('📅 Creating event from calendar');
+    if (onCreateEvent && selectedTimeSlot) {
+      onCreateEvent({
+        date: selectedTimeSlot.date,
+        time: selectedTimeSlot.time,
+        hour: selectedTimeSlot.hour
+      });
+    }
+    setShowCreateModal(false);
+  };
+
+  // Close modal
+  const closeModal = () => {
+    console.log('❌ Closing modal');
+    setShowCreateModal(false);
+    setSelectedTimeSlot(null);
   };
 
   const getHoliday = (date) => {
@@ -109,6 +183,19 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
       
       // Check if the view date falls within the event's date range
       return viewDate >= eventStartDate && viewDate <= eventEndDate;
+    });
+  };
+
+  // Get diaries for specific date
+  const getDiariesForDate = (date) => {
+    const viewDate = new Date(date);
+    viewDate.setHours(0, 0, 0, 0);
+    
+    return diaries.filter(diary => {
+      const diaryDate = new Date(diary.date);
+      diaryDate.setHours(0, 0, 0, 0);
+      
+      return viewDate.getTime() === diaryDate.getTime();
     });
   };
 
@@ -367,8 +454,18 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
   const renderDayView = () => {
     // Use currentDate instead of selectedDate for consistency
     const dayEvents = getEventsForDate(currentDate);
+    const dayDiaries = getDiariesForDate(currentDate);
     const isToday = currentDate.toDateString() === new Date().toDateString();
     const holiday = getHoliday(currentDate);
+    
+    // Debug: Log day view data
+    console.log('🌅 renderDayView:', {
+      currentDate: currentDate.toISOString(),
+      dayEvents: dayEvents.length,
+      dayDiaries: dayDiaries.length,
+      isToday: isToday,
+      holiday: holiday
+    });
 
     return (
       <div className="day-view">
@@ -394,6 +491,22 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
           </div>
 
           <div className="day-content">
+            {/* Clickable time slots */}
+            {generateTimeSlots().map((slot, idx) => (
+              <div
+                key={`slot-${idx}`}
+                className="time-slot-clickable"
+                style={{
+                  top: `${slot.hour * 60}px`,
+                  height: '60px'
+                }}
+                onClick={() => handleTimeSlotClick(slot.hour)}
+                title={`Click để tạo nhật ký hoặc sự kiện lúc ${slot.label}`}
+              >
+                <div className="slot-hover-effect"></div>
+              </div>
+            ))}
+
             {/* Current time indicator for today */}
             {isToday && (
               <div
@@ -469,11 +582,43 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
               );
             })}
 
+            {/* Diaries */}
+            {dayDiaries.map((diary, idx) => {
+              // Calculate diary position based on creation time or default to 9 AM
+              const diaryTime = diary.created_at ? new Date(diary.created_at) : new Date();
+              const diaryHour = diaryTime.getHours();
+              const diaryMinute = diaryTime.getMinutes();
+              const topPosition = (diaryHour * 60 + diaryMinute) * (60 / 60);
+              
+              return (
+                <div
+                  key={`diary-${diary.id}`}
+                  className="day-diary"
+                  style={{
+                    top: `${topPosition}px`,
+                    height: '40px',
+                    width: '90%',
+                    left: '5%',
+                    backgroundColor: '#10B981'
+                  }}
+                  onClick={() => onDiaryClick && onDiaryClick(diary)}
+                  title={`Nhật ký: ${diary.title}`}
+                >
+                  <div className="diary-title">
+                    📝 {diary.title}
+                  </div>
+                  <div className="diary-time">
+                    {diaryTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              );
+            })}
+
             {/* Empty state */}
-            {dayEvents.length === 0 && (
+            {dayEvents.length === 0 && dayDiaries.length === 0 && (
               <div className="empty-day">
                 <div className="empty-icon">📅</div>
-                <p>Không có sự kiện nào trong ngày này</p>
+                <p>Không có sự kiện hoặc nhật ký nào trong ngày này</p>
               </div>
             )}
           </div>
@@ -519,6 +664,68 @@ const GoogleCalendar = ({ events = [], onEventClick, onTimeSlotClick }) => {
         {view === 'month' && renderMonthView()}
         {view === 'week' && renderWeekView()}
         {view === 'day' && renderDayView()}
+      </div>
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="create-modal-overlay" onClick={closeModal}>
+          <div className="create-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Tạo mới</h3>
+              <button className="close-btn" onClick={closeModal}>×</button>
+            </div>
+            
+            <div className="modal-content">
+              <div className="time-info">
+                <p>Thời gian: {selectedTimeSlot?.date.toLocaleDateString('vi-VN')} lúc {selectedTimeSlot?.hour < 12 ? `${selectedTimeSlot?.hour} AM` : `${selectedTimeSlot?.hour === 12 ? 12 : selectedTimeSlot?.hour - 12} PM`}</p>
+              </div>
+              
+              <div className="create-options">
+                <button 
+                  className={`create-option ${createType === 'diary' ? 'active' : ''}`}
+                  onClick={() => setCreateType('diary')}
+                >
+                  📝 Tạo nhật ký
+                </button>
+                <button 
+                  className={`create-option ${createType === 'event' ? 'active' : ''}`}
+                  onClick={() => setCreateType('event')}
+                >
+                  📅 Tạo sự kiện
+                </button>
+              </div>
+              
+              <div className="modal-actions">
+                <button className="btn-cancel" onClick={closeModal}>
+                  Hủy
+                </button>
+                <button 
+                  className="btn-create"
+                  onClick={createType === 'diary' ? handleCreateDiary : handleCreateEvent}
+                >
+                  {createType === 'diary' ? 'Tạo nhật ký' : 'Tạo sự kiện'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Debug Info */}
+      <div style={{ 
+        position: 'fixed', 
+        bottom: '10px', 
+        right: '10px', 
+        background: 'rgba(0,0,0,0.8)', 
+        color: 'white', 
+        padding: '10px', 
+        borderRadius: '5px',
+        fontSize: '12px',
+        zIndex: 9999
+      }}>
+        <div>View: {view}</div>
+        <div>Modal: {showCreateModal ? 'Visible' : 'Hidden'}</div>
+        <div>TimeSlot: {selectedTimeSlot ? `${selectedTimeSlot.hour}:00` : 'None'}</div>
       </div>
     </div>
   );

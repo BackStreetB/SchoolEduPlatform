@@ -2,16 +2,16 @@ const { pool } = require('../config/database');
 
 class DiaryEntry {
   static async create(userId, entryData) {
-    const { title, content, mood, tags, is_private } = entryData;
+    const { title, content, mood, tags, is_private, media_files } = entryData;
     
     try {
       const query = `
-        INSERT INTO diary_entries (user_id, title, content, mood, tags, is_private)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO diary_entries (user_id, title, content, mood, tags, is_private, media_files)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `;
       
-      const values = [userId, title, content, mood, tags || [], is_private !== false];
+      const values = [userId, title, content, mood, tags || [], is_private !== false, media_files || []];
       const result = await pool.query(query, values);
       
       return result.rows[0];
@@ -32,15 +32,15 @@ class DiaryEntry {
 
   static async update(id, userId, updateData) {
     try {
-      const { title, content, mood, tags, is_private } = updateData;
+      const { title, content, mood, tags, is_private, media_files } = updateData;
       const query = `
         UPDATE diary_entries 
-        SET title = $1, content = $2, mood = $3, tags = $4, is_private = $5, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $6 AND user_id = $7
+        SET title = $1, content = $2, mood = $3, tags = $4, is_private = $5, media_files = $6, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $7 AND user_id = $8
         RETURNING *
       `;
       
-      const values = [title, content, mood, tags || [], is_private !== false, id, userId];
+      const values = [title, content, mood, tags || [], is_private !== false, media_files || [], id, userId];
       const result = await pool.query(query, values);
       return result.rows[0];
     } catch (error) {

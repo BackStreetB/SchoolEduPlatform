@@ -24,7 +24,7 @@ async function getUserName(userId) {
 // Tạo sự kiện mới
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { title, description, start_date, end_date, start_time, end_time, type, color } = req.body;
+    const { title, description, start_date, end_date, start_time, end_time, type, color, media_files } = req.body;
     const userId = req.user.id;
     
     // Kiểm tra ngày bắt đầu không được trong quá khứ
@@ -50,13 +50,13 @@ router.post('/', authenticateToken, async (req, res) => {
     }
     
     const query = `
-      INSERT INTO events (user_id, title, description, start_date, end_date, start_time, end_time, type, color, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+      INSERT INTO events (user_id, title, description, start_date, end_date, start_time, end_time, type, color, media_files, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
       RETURNING *
     `;
     
     const result = await pool.query(query, [
-      userId, title, description, start_date, end_date, start_time, end_time, type, color || 'blue'
+      userId, title, description, start_date, end_date, start_time, end_time, type, color || 'blue', media_files || []
     ]);
     
     res.status(201).json(result.rows[0]);
@@ -81,6 +81,43 @@ router.get('/', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching events:', error);
     res.status(500).json({ error: 'Lỗi lấy danh sách sự kiện' });
+  }
+});
+
+// Lấy sự kiện mà user đã tham gia (cho calendar)
+router.get('/joined', authenticateToken, async (req, res) => {
+  console.log('=== JOINED API START ===');
+  console.log('req.user:', req.user);
+  try {
+    const userId = req.user.id;
+    console.log('Joined API - userId:', userId, 'type:', typeof userId);
+    
+    // Validate userId
+    if (!userId) {
+      console.error('Missing userId:', userId);
+      return res.status(400).json({ error: 'Missing user ID' });
+    }
+    
+    // Debug: Kiểm tra event_participants trước
+    const debugQuery = 'SELECT * FROM event_participants WHERE user_id = $1';
+    const debugResult = await pool.query(debugQuery, [parseInt(userId)]);
+    console.log('Debug - All participants for user:', debugResult.rows);
+    
+    const query = `
+      SELECT DISTINCT e.*, ep.joined_at
+      FROM events e
+      INNER JOIN event_participants ep ON e.id = ep.event_id
+      WHERE ep.user_id = $1
+      ORDER BY e.start_date ASC, e.start_time ASC
+    `;
+    
+    const result = await pool.query(query, [parseInt(userId)]);
+    console.log('Joined events found:', result.rows.length);
+    console.log('Joined events data:', result.rows);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching joined events:', error);
+    res.status(500).json({ error: 'Lỗi lấy danh sách sự kiện đã tham gia' });
   }
 });
 
@@ -113,7 +150,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, start_date, end_date, start_time, end_time, type, color } = req.body;
+    const { title, description, start_date, end_date, start_time, end_time, type, color, media_files } = req.body;
     const userId = req.user.id;
     
     // Lấy thông tin sự kiện
@@ -148,13 +185,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
     
     const updateQuery = `
       UPDATE events 
-      SET title = $1, description = $2, start_date = $3, end_date = $4, start_time = $5, end_time = $6, type = $7, color = $8, updated_at = NOW()
-      WHERE id = $9 AND user_id = $10
+      SET title = $1, description = $2, start_date = $3, end_date = $4, start_time = $5, end_time = $6, type = $7, color = $8, media_files = $9, updated_at = NOW()
+      WHERE id = $10 AND user_id = $11
       RETURNING *
     `;
     
     const result = await pool.query(updateQuery, [
-      title, description, start_date, end_date, start_time, end_time, type, color || 'blue', id, userId
+      title, description, start_date, end_date, start_time, end_time, type, color || 'blue', media_files || [], id, userId
     ]);
     
     res.json(result.rows[0]);
@@ -276,43 +313,6 @@ router.get('/joined-debug', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error in joined-debug:', error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// Lấy sự kiện mà user đã tham gia (cho calendar)
-router.get('/joined', authenticateToken, async (req, res) => {
-  console.log('=== JOINED API START ===');
-  console.log('req.user:', req.user);
-  try {
-    const userId = req.user.id;
-    console.log('Joined API - userId:', userId, 'type:', typeof userId);
-    
-    // Validate userId
-    if (!userId) {
-      console.error('Missing userId:', userId);
-      return res.status(400).json({ error: 'Missing user ID' });
-    }
-    
-    // Debug: Kiểm tra event_participants trước
-    const debugQuery = 'SELECT * FROM event_participants WHERE user_id = $1';
-    const debugResult = await pool.query(debugQuery, [parseInt(userId)]);
-    console.log('Debug - All participants for user:', debugResult.rows);
-    
-    const query = `
-      SELECT DISTINCT e.*, ep.joined_at
-      FROM events e
-      INNER JOIN event_participants ep ON e.id = ep.event_id
-      WHERE ep.user_id = $1
-      ORDER BY e.start_date ASC, e.start_time ASC
-    `;
-    
-    const result = await pool.query(query, [parseInt(userId)]);
-    console.log('Joined events found:', result.rows.length);
-    console.log('Joined events data:', result.rows);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Error fetching joined events:', error);
-    res.status(500).json({ error: 'Lỗi lấy danh sách sự kiện đã tham gia' });
   }
 });
 

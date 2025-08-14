@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Calendar Simple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .calendar-test {
+            border: 2px solid #1a73e8;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .time-slot {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            background: #e3f2fd;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+        .time-slot:hover {
+            background: #bbdefb;
+            border-color: #1976d2;
+            transform: translateY(-2px);
+        }
+        .diary-item {
+            background: #10B981;
+            color: white;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #059669;
+        }
+        .event-item {
+            background: #3B82F6;
+            color: white;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #2563EB;
+        }
+        .test-button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+        .test-button:hover {
+            background: #1557b0;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test Calendar Features - Simple Version</h1>
+        
+        <div class="debug-info">
+            <h3>Debug Info:</h3>
+            <p>✅ Calendar component đã được cập nhật</p>
+            <p>✅ Diaries sẽ hiển thị trên calendar</p>
+            <p>✅ MediaUpload đã được tích hợp</p>
+            <p>❌ Có lỗi uploads/null trong logs</p>
+        </div>
+
+        <div class="calendar-test">
+            <h2>📅 Calendar Test Area</h2>
+            <p>Đây là mô phỏng calendar để test:</p>
+            
+            <div class="time-slot" onclick="testTimeSlot(9)">
+                🕘 9:00 AM - Click để tạo nhật ký/sự kiện
+            </div>
+            
+            <div class="time-slot" onclick="testTimeSlot(14)">
+                🕑 2:00 PM - Click để tạo nhật ký/sự kiện
+            </div>
+            
+            <div class="time-slot" onclick="testTimeSlot(19)">
+                🕖 7:00 PM - Click để tạo nhật ký/sự kiện
+            </div>
+
+            <h3>Nhật ký hiện tại (sẽ hiển thị trên calendar):</h3>
+            <div class="diary-item">
+                📝 Test Diary 1 - 14/08/2025 10:30
+            </div>
+            <div class="diary-item">
+                📝 Test Diary 2 - 14/08/2025 15:45
+            </div>
+
+            <h3>Sự kiện hiện tại (sẽ hiển thị trên calendar):</h3>
+            <div class="event-item">
+                📅 Test Event 1 - 14/08/2025 09:00-10:00
+            </div>
+        </div>
+
+        <div class="test-button" onclick="testMediaUpload()">
+            Test MediaUpload Component
+        </div>
+
+        <div class="test-button" onclick="testCalendarDisplay()">
+            Test Calendar Display
+        </div>
+
+        <h2>Hướng dẫn test thật:</h2>
+        <ol>
+            <li>Vào <code>localhost:3000</code></li>
+            <li>Vào tab <strong>Bảng điều khiển</strong></li>
+            <li>Chuyển calendar sang view <strong>"Ngày"</strong></li>
+            <li>Click vào khung giờ bất kỳ</li>
+            <li>Xem có popup modal không</li>
+            <li>Kiểm tra console có lỗi gì không</li>
+        </ol>
+
+        <h2>Vấn đề cần kiểm tra:</h2>
+        <ul>
+            <li>❌ <strong>MediaUpload</strong> - có thể chọn file không?</li>
+            <li>❌ <strong>Calendar click</strong> - có popup modal không?</li>
+            <li>❌ <strong>Diary display</strong> - có hiển thị trên calendar không?</li>
+            <li>❌ <strong>Console errors</strong> - có lỗi gì không?</li>
+        </ul>
+    </div>
+
+    <script>
+        function testTimeSlot(hour) {
+            console.log(`🎯 Test time slot ${hour}:00 clicked`);
+            alert(`Khung giờ ${hour}:00 đã được click! Trong calendar thật, điều này sẽ mở popup modal.`);
+        }
+
+        function testMediaUpload() {
+            console.log('📁 Testing MediaUpload component');
+            alert('MediaUpload component sẽ hiển thị trong form tạo nhật ký/sự kiện. Kiểm tra xem có hoạt động không.');
+        }
+
+        function testCalendarDisplay() {
+            console.log('📅 Testing Calendar display');
+            alert('Calendar sẽ hiển thị nhật ký với màu xanh lá và sự kiện với màu xanh dương. Kiểm tra xem có hiển thị đúng không.');
+        }
+
+        console.log('🚀 Test page loaded successfully!');
+        console.log('🔍 Check console for debug information');
+    </script>
+</body>
+</html>

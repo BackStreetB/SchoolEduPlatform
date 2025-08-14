@@ -12,8 +12,6 @@ Hệ thống đã được cấu hình để **ĐẢM BẢO DỮ LIỆU KHÔNG B
 
 ### 1. Database (PostgreSQL)
 - **Volume**: `postgres_data`
-- **Vị trí**: `/var/lib/docker/volumes/local_postgres_data/_data`
-- **Dữ liệu bao gồm**:
   - Tài khoản người dùng
   - Thông tin profile
   - Bài viết cộng đồng

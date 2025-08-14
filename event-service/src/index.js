@@ -40,33 +40,7 @@ app.get('/api/events/joined-test-direct', async (req, res) => {
   res.json({ success: true, message: 'Direct test works', count: 0 });
 });
 
-// API joined events thực sự - BYPASS AUTH nhưng accept headers
-app.get('/api/events/joined', async (req, res) => {
-  console.log('🔥 JOINED API BYPASS AUTH - WITH HEADERS!');
-  
-  try {
-    // Hardcode user 14 để test (sẽ fix auth sau)
-    const userId = 14;
-    console.log('Testing with userId:', userId);
-    
-    const { pool } = require('./config/database');
-    const query = `
-      SELECT DISTINCT e.*, ep.joined_at
-      FROM events e
-      INNER JOIN event_participants ep ON e.id = ep.event_id
-      WHERE ep.user_id = $1
-      ORDER BY e.start_date ASC, e.start_time ASC
-    `;
-    
-    const result = await pool.query(query, [userId]);
-    console.log('Found events:', result.rows.length);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Error in joined bypass:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// Route này đã được xóa để tránh conflict với route trong eventRoutes
 
 // Routes
 app.use('/api/events', eventRoutes);
